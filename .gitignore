@@ -11,3 +11,8 @@ spike-output/
 next-env.d.ts
 *.tsbuildinfo
 .claude/
+.vercel
+.env*
+!.env.example
+.agents/
+skills-lock.json
