@@ -1,3 +1,5 @@
+import { EgglessApp } from "@/components/EgglessApp";
+
 export default function Home() {
-  return <main>Eggless</main>;
+  return <EgglessApp />;
 }

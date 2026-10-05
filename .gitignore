@@ -10,3 +10,4 @@ spike-output/
 .superpowers/
 next-env.d.ts
 *.tsbuildinfo
+.claude/
