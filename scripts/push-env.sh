@@ -17,6 +17,9 @@ for name in "${NAMES[@]}"; do
   type_flag=()
   case "$name" in NEXT_PUBLIC_*) type_flag=(--type config) ;; esac
   value=$(grep -E "^${name}=" .env.local | head -1 | cut -d= -f2- || true)
+  # `vercel env pull` writes values wrapped in double quotes; upload the value without them.
+  value="${value#\"}"
+  value="${value%\"}"
   if [ -z "$value" ]; then
     echo "skip  $name (empty in .env.local)"
     continue
