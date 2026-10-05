@@ -4,7 +4,7 @@ import type { Fetched, MenuFetcher } from "@/lib/types";
 
 const publicLookup = async () => ["93.184.216.34"];
 
-function response(body: string | Uint8Array, init: ResponseInit & { url?: string } = {}) {
+function response(body: string | Uint8Array<ArrayBuffer>, init: ResponseInit = {}) {
   return new Response(body, init);
 }
 
