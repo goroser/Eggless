@@ -4,7 +4,7 @@ Find a breakfast place for someone who does not eat eggs.
 
 Search a map for cafés and see each one's breakfast menu with the egg dishes already removed, ranked by how many real egg-free options it has. Built for Inga, because brunch menus are mostly eggs.
 
-> **Status:** Phase 1 MVP built and tested; deployment pending. "Eggless" is a working name.
+> **Status:** Phase 1 MVP live at https://eggless-gold.vercel.app (private link). "Eggless" is a working name.
 
 ## How it works
 
@@ -67,9 +67,9 @@ docs/
    - a Map ID (Google Maps Platform → Map management, type JavaScript, vector) → `NEXT_PUBLIC_GOOGLE_MAP_ID`;
    - a quota on Places API (New) Text Search of 30 requests per day, so usage stops instead of billing.
 2. **Anthropic:** an API key in a workspace → `ANTHROPIC_API_KEY`.
-3. **Vercel and Neon:** `vercel link`, then `vercel install neon`, then `vercel env pull .env.local` for `DATABASE_URL`. Run `npm run db:migrate`.
+3. **Vercel and Neon:** `npx vercel link`, then `npx vercel integration add neon` (writes `DATABASE_URL` into `.env.local`). Run `npm run db:migrate`.
 4. **Secrets:** `ACCESS_KEY` and `MENU_TOKEN_SECRET`, each from `openssl rand -base64 32`.
-5. Copy every variable in [.env.example](.env.example) into `.env.local` for development and into the Vercel project for production.
+5. Fill `.env.local` from [.env.example](.env.example), then `bash scripts/push-env.sh` to copy it to Vercel production without printing values, and `npx vercel deploy --prod`.
 
 Commands:
 
@@ -84,12 +84,12 @@ Commands:
 ## Roadmap
 
 - [x] **Phase 0, spike:** script over about 20 Chiswick cafés to measure menu coverage and classification quality. Result: go, see [docs/SPIKE.md](docs/SPIKE.md).
-- [ ] **Phase 1, MVP:** search, "near me", extraction, storage, map and cards, private link, deployed. Built; deployment pending.
+- [x] **Phase 1, MVP:** search, "near me", extraction, storage, map and cards, private link, deployed. Live smoke run: 14/20 Chiswick cafés usable (spike: 12/20); repeat searches served from the cache.
 - [ ] **Phase 2:** ranking polish, "this is wrong" overrides, nightly refresh, PWA.
 - [ ] **Phase 3:** image menus, rendering fallback, favourites, sharing.
 
 ## Next step
 
-Deploy Phase 1 (Setup above), then run `npm run smoke -- https://<domain>` and expect at least the spike's 12 of 20 Chiswick cafés.
+Phase 2. Which cafés Google returns varies between searches, and in some result sets most cafés publish no readable menu, so ranking polish and image-menu coverage matter most. Deferred review items are listed in the Phase 1 plan's ledger summary.
 
 Open design questions are listed at the end of the architecture document.
