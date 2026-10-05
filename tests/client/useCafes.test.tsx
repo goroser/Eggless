@@ -126,4 +126,24 @@ describe("useCafes", () => {
     await waitFor(() => expect(result.current.cafes[0].menu?.counts?.options).toBe(2));
     expect(result.current.cafes[0].failed).toBeUndefined();
   });
+
+  test("a failed newer search does not leave earlier cards loading forever", async () => {
+    let searches = 0;
+    stubFetch((url) => {
+      if (url === "/api/search") {
+        searches++;
+        return searches === 1
+          ? searchResponse([cafe("a", null, { token: "t" })])
+          : Response.json({ error: "Daily search limit reached, try again tomorrow" }, { status: 503 });
+      }
+      return new Promise<Response>(() => {});
+    });
+    const { result } = renderHook(() => useCafes());
+    await act(() => result.current.search({ rect: RECT }));
+    expect(result.current.cafes[0].loading).toBe(true);
+    await act(() => result.current.search({ rect: RECT }));
+    expect(result.current.error).toBe("Daily search limit reached, try again tomorrow");
+    expect(result.current.cafes[0].loading).toBe(false);
+    expect(result.current.cafes[0].failed).toEqual({ expired: false });
+  });
 });

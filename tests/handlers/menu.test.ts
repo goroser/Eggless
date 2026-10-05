@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { sql } from "drizzle-orm";
-import { APICallError } from "ai";
+import { APICallError, NoObjectGeneratedError } from "ai";
 import { handleMenu } from "@/lib/handlers/menu";
 import { claimMenu, saveMenu } from "@/lib/db/menus";
 import { signToken } from "@/lib/token";
@@ -106,9 +106,14 @@ describe("handleMenu", () => {
     expect(extract).toHaveBeenCalledTimes(1);
   });
 
-  test("a non-transient model error is stored as fetch_failed", async () => {
+  test("a menu the model cannot read is stored as fetch_failed", async () => {
     const extract = vi.fn(async () => {
-      throw new Error("No object generated");
+      throw new NoObjectGeneratedError({
+        message: "No object generated",
+        response: { id: "r", timestamp: new Date(), modelId: "m" },
+        usage: {} as never,
+        finishReason: "stop" as never,
+      });
     });
     const r = await handleMenu({ token: token() }, deps(extract));
     expect(r.status).toBe(200);
@@ -121,6 +126,40 @@ describe("handleMenu", () => {
       throw new APICallError({ message: "overloaded", url: "u", requestBodyValues: {}, statusCode: 529, isRetryable: true });
     });
     const r = await handleMenu({ token: token() }, deps(extract));
+    expect(r).toEqual({ status: 503, json: { error: "temporary", retry: true } });
+    expect(await claimMenu(db, "p1", NOW)).toBe(true);
+  });
+
+  test.each([
+    ["a bad API key", new APICallError({ message: "invalid x-api-key", url: "u", requestBodyValues: {}, statusCode: 401 })],
+    ["low credit", new APICallError({ message: "Your credit balance is too low", url: "u", requestBodyValues: {}, statusCode: 400 })],
+    ["an unknown error", new Error("socket hang up")],
+  ])("%s releases the claim instead of caching a failure", async (_label, err) => {
+    const extract = vi.fn(async () => {
+      throw err;
+    });
+    const r = await handleMenu({ token: token() }, deps(extract));
+    expect(r).toEqual({ status: 503, json: { error: "temporary", retry: true } });
+    expect(await claimMenu(db, "p1", NOW)).toBe(true);
+  });
+
+  test("an extraction past its time budget is stored as fetch_failed", async () => {
+    const extract: ExtractFn = (_s, opts) =>
+      new Promise((_resolve, reject) => opts?.abortSignal?.addEventListener("abort", () => reject(opts.abortSignal!.reason)));
+    const r = await handleMenu({ token: token() }, { ...deps(extract), budgets: { collectMs: 5_000, extractMs: 50 } });
+    expect(r.status).toBe(200);
+    expect((r.json as MenuSummary).status).toBe("fetch_failed");
+  });
+
+  test("the extractor receives an abort signal", async () => {
+    const extract = vi.fn<ExtractFn>(async () => menu);
+    await handleMenu({ token: token() }, deps(extract));
+    expect(extract.mock.calls[0][1]?.abortSignal).toBeInstanceOf(AbortSignal);
+  });
+
+  test("a database error while saving releases the claim and asks for a retry", async () => {
+    await db.execute(sql`drop table dishes`);
+    const r = await handleMenu({ token: token() }, deps(vi.fn(async () => menu)));
     expect(r).toEqual({ status: 503, json: { error: "temporary", retry: true } });
     expect(await claimMenu(db, "p1", NOW)).toBe(true);
   });

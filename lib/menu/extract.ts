@@ -1,5 +1,5 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { APICallError, generateText, Output, RetryError, type LanguageModel } from "ai";
+import { APICallError, generateText, NoObjectGeneratedError, Output, RetryError, type LanguageModel } from "ai";
 import { z } from "zod";
 import type { ExtractedMenu } from "@/lib/types";
 import type { Sources } from "@/lib/menu/collect";
@@ -56,7 +56,7 @@ Rules:
 - Content may include photos of a printed menu: read them the same way.
 - If the content has no real menu (just opening hours, booking, "see our menu" links), set menuFound=false and return no dishes.`;
 
-export type ExtractFn = (sources: Sources) => Promise<ExtractedMenu>;
+export type ExtractFn = (sources: Sources, opts?: { abortSignal?: AbortSignal }) => Promise<ExtractedMenu>;
 
 function defaultModel(): LanguageModel {
   const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID;
@@ -66,7 +66,7 @@ function defaultModel(): LanguageModel {
 }
 
 export function createExtractor(opts: { model?: LanguageModel } = {}): ExtractFn {
-  return async ({ texts, pdfs, images }) => {
+  return async ({ texts, pdfs, images }, callOpts = {}) => {
     const textBlock = texts.map((t) => `--- SOURCE: ${t.url} ---\n${t.text.slice(0, MAX_TEXT_CHARS)}`).join("\n\n");
     const content: Array<
       | { type: "text"; text: string }
@@ -87,17 +87,23 @@ export function createExtractor(opts: { model?: LanguageModel } = {}): ExtractFn
       messages: [{ role: "user", content }],
       output: Output.object({ schema: MenuSchema }),
       temperature: 0,
+      abortSignal: callOpts.abortSignal,
     });
     return output as ExtractedMenu;
   };
 }
 
-// Worth retrying later rather than caching the café as unreadable for a week.
-export function isTransientLlmError(e: unknown): boolean {
-  if (RetryError.isInstance(e)) return isTransientLlmError(e.lastError);
+// True only when the café's own content is the problem (the model could not read a menu from it,
+// or the API rejected its PDF or image). Everything else (rate limits, outages, a bad key, no credit,
+// a wrong model name) is ours to fix, so the café must not be cached as unreadable.
+export function isCafeAttributableLlmError(e: unknown): boolean {
+  if (RetryError.isInstance(e)) return isCafeAttributableLlmError(e.lastError);
+  if (NoObjectGeneratedError.isInstance(e)) return true;
   if (APICallError.isInstance(e)) {
-    const s = e.statusCode ?? 0;
-    return e.isRetryable || s === 429 || s >= 500;
+    if (e.statusCode === 413) return true;
+    if (e.statusCode !== 400) return false;
+    const text = `${e.message} ${e.responseBody ?? ""}`;
+    return /pdf|image|document|media|too large|too many pages/i.test(text) && !/credit|billing|balance/i.test(text);
   }
-  return e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+  return false;
 }

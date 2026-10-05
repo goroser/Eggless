@@ -16,6 +16,7 @@ const MAX_PDF_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MIN_IMAGE_BYTES = 60 * 1024;
 const MAX_PDFS = 3;
+const MAX_TOTAL_PDF_BYTES = 20 * 1024 * 1024; // base64 inflates by a third; Anthropic caps requests at 32 MB
 const MAX_IMAGES = 4;
 const CANDIDATES_PER_HOP = 3;
 const MIN_PAGE_TEXT = 200; // below this a page contributes no text
@@ -33,7 +34,17 @@ function readPage(f: Fetched): Page | null {
   return { url: f.url, html, text: htmlToText(html) };
 }
 
-export async function collectSources(fetcher: MenuFetcher, websiteUri: string): Promise<CollectResult> {
+export async function collectSources(
+  baseFetcher: MenuFetcher,
+  websiteUri: string,
+  opts: { deadline?: number; now?: () => number } = {},
+): Promise<CollectResult> {
+  const now = opts.now ?? Date.now;
+  const deadline = opts.deadline ?? Infinity;
+  // Past the deadline no new fetch starts, so a slow site cannot run past the function's time limit.
+  const fetcher: MenuFetcher = (url, maxBytes) =>
+    now() >= deadline ? Promise.reject(new Error("time budget spent")) : baseFetcher(url, maxBytes);
+
   let home: Fetched;
   try {
     home = await fetchHome(fetcher, websiteUri);
@@ -104,7 +115,11 @@ export async function collectSources(fetcher: MenuFetcher, websiteUri: string): 
     }
   }
 
-  const bestPdfs = pdfs.sort((a, b) => b.score - a.score).slice(0, MAX_PDFS);
+  let pdfBytes = 0;
+  const bestPdfs = pdfs
+    .sort((a, b) => b.score - a.score)
+    .filter((p) => (pdfBytes + p.data.length <= MAX_TOTAL_PDF_BYTES ? ((pdfBytes += p.data.length), true) : false))
+    .slice(0, MAX_PDFS);
   const sourceUrls = [...texts.map((t) => t.url), ...bestPdfs.map((p) => p.url), ...images.map((i) => i.url)];
   const textChars = texts.reduce((n, t) => n + t.text.length, 0);
   if (bestPdfs.length === 0 && images.length === 0 && textChars < MIN_TOTAL_TEXT) {

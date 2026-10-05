@@ -6,7 +6,7 @@ import { createFetcher } from "@/lib/menu/fetch";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  if (!process.env.MENU_TOKEN_SECRET) return Response.json({ error: "server is not configured" }, { status: 500 });
+  if (!process.env.MENU_TOKEN_SECRET || !process.env.ANTHROPIC_API_KEY) return Response.json({ error: "server is not configured" }, { status: 500 });
   const body = await req.json().catch(() => undefined);
   const { status, json } = await handleMenu(body, {
     db: getDb(),

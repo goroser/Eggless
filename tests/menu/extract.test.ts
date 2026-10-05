@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { APICallError, RetryError } from "ai";
+import { APICallError, LoadAPIKeyError, NoObjectGeneratedError, RetryError } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
-import { createExtractor, isTransientLlmError, PROMPT_VERSION } from "@/lib/menu/extract";
+import { createExtractor, isCafeAttributableLlmError, PROMPT_VERSION } from "@/lib/menu/extract";
 import type { ExtractedMenu } from "@/lib/types";
 
 const menu: ExtractedMenu = {
@@ -56,20 +56,34 @@ describe("createExtractor", () => {
   test("prompt version is 1", () => expect(PROMPT_VERSION).toBe(1));
 });
 
-describe("isTransientLlmError", () => {
-  const apiError = (statusCode: number, isRetryable = false) =>
-    new APICallError({ message: "x", url: "u", requestBodyValues: {}, statusCode, isRetryable });
+describe("isCafeAttributableLlmError", () => {
+  const apiError = (statusCode: number, message = "x", isRetryable = false) =>
+    new APICallError({ message, url: "u", requestBodyValues: {}, statusCode, isRetryable });
+  const noObject = () =>
+    new NoObjectGeneratedError({
+      message: "No object generated",
+      response: { id: "r", timestamp: new Date(), modelId: "m" },
+      usage: {} as never,
+      finishReason: "stop" as never,
+    });
 
-  test.each([429, 500, 529])("status %i is transient", (s) => expect(isTransientLlmError(apiError(s))).toBe(true));
-  test("isRetryable is transient", () => expect(isTransientLlmError(apiError(418, true))).toBe(true));
-  test("400 is not transient", () => expect(isTransientLlmError(apiError(400))).toBe(false));
-  test("timeouts are transient", () => {
-    expect(isTransientLlmError(new DOMException("t", "TimeoutError"))).toBe(true);
-    expect(isTransientLlmError(new DOMException("a", "AbortError"))).toBe(true);
+  test("the model could not produce a menu from this content", () => expect(isCafeAttributableLlmError(noObject())).toBe(true));
+  test("the café's PDF or image was rejected", () => {
+    expect(isCafeAttributableLlmError(apiError(400, "The PDF specified was not valid"))).toBe(true);
+    expect(isCafeAttributableLlmError(apiError(400, "Could not process image"))).toBe(true);
+    expect(isCafeAttributableLlmError(apiError(413, "request too large"))).toBe(true);
+  });
+  test.each([429, 500, 529])("status %i is ours, not the café's", (s) => expect(isCafeAttributableLlmError(apiError(s))).toBe(false));
+  test.each([401, 403, 404])("account/config status %i is ours, not the café's", (s) =>
+    expect(isCafeAttributableLlmError(apiError(s))).toBe(false));
+  test("low credit is ours, not the café's", () =>
+    expect(isCafeAttributableLlmError(apiError(400, "Your credit balance is too low to access the Anthropic API"))).toBe(false));
+  test("a missing API key is ours", () => expect(isCafeAttributableLlmError(new LoadAPIKeyError({ message: "missing" }))).toBe(false));
+  test("timeouts and unknown errors are ours", () => {
+    expect(isCafeAttributableLlmError(new DOMException("t", "TimeoutError"))).toBe(false);
+    expect(isCafeAttributableLlmError(new Error("socket hang up"))).toBe(false);
   });
   test("a RetryError is judged by its last error", () => {
-    const err = new RetryError({ message: "m", reason: "maxRetriesExceeded", errors: [apiError(529)] });
-    expect(isTransientLlmError(err)).toBe(true);
+    expect(isCafeAttributableLlmError(new RetryError({ message: "m", reason: "maxRetriesExceeded", errors: [apiError(529)] }))).toBe(false);
   });
-  test("a schema error is not transient", () => expect(isTransientLlmError(new Error("No object generated"))).toBe(false));
 });

@@ -94,4 +94,37 @@ describe("collectSources", () => {
     if (r.kind !== "sources") throw new Error("expected sources");
     expect(r.sources.texts.map((t) => t.url)).toEqual(["https://cafe.example/"]);
   });
+
+  test("stops starting new fetches after the deadline", async () => {
+    let clock = 0;
+    const { fetcher, calls } = fixtureFetcher({
+      "https://cafe.example/": html(`<p>${words(80)}</p><a href="/menu">Menu</a><a href="/breakfast">Breakfast</a><a href="/brunch">Brunch</a>`),
+      "https://cafe.example/menu": html(`<p>${words(80)}</p>`),
+      "https://cafe.example/breakfast": html(`<p>${words(80)}</p>`),
+      "https://cafe.example/brunch": html(`<p>${words(80)}</p>`),
+    });
+    const slow: typeof fetcher = async (url, max) => {
+      clock += 10_000;
+      return fetcher(url, max);
+    };
+    const r = await collectSources(slow, "https://cafe.example/", { deadline: 15_000, now: () => clock });
+    expect(calls).toHaveLength(2);
+    expect(r.kind).toBe("sources");
+  });
+
+  test("keeps PDFs under 20 MB in total", async () => {
+    const MB = 1024 * 1024;
+    const { fetcher } = fixtureFetcher({
+      "https://cafe.example/": html(
+        `<p>${words(80)}</p><a href="/breakfast.pdf">Breakfast menu</a><a href="/brunch.pdf">Brunch menu</a><a href="/food.pdf">Food menu</a>`,
+      ),
+      "https://cafe.example/breakfast.pdf": pdf(9 * MB),
+      "https://cafe.example/brunch.pdf": pdf(9 * MB),
+      "https://cafe.example/food.pdf": pdf(9 * MB),
+    });
+    const r = await collectSources(fetcher, "https://cafe.example/");
+    if (r.kind !== "sources") throw new Error("expected sources");
+    expect(r.sources.pdfs).toHaveLength(2);
+    expect(r.sources.pdfs.reduce((n, p) => n + p.data.length, 0)).toBeLessThanOrEqual(20 * MB);
+  });
 });

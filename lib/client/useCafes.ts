@@ -22,6 +22,10 @@ const fetchMenu: FetchMenu = async (token) => {
 
 const rank = (cafes: CafeState[]) => rankCafes(cafes) as CafeState[];
 
+// The queue was cancelled for the new search; cards still waiting would otherwise spin forever.
+const stopLoading = (cafes: CafeState[]) =>
+  cafes.map((c) => (c.loading ? { ...c, loading: false, failed: { expired: false } } : c));
+
 export function useCafes() {
   const [cafes, setCafes] = useState<CafeState[]>([]);
   const [searching, setSearching] = useState(false);
@@ -62,13 +66,17 @@ export function useCafes() {
       const json = (await res.json().catch(() => ({}))) as { cafes?: CafeResult[]; error?: string };
       if (seq !== searchSeq.current) return; // a newer search has started
       if (!res.ok || !json.cafes) {
+        setCafes(stopLoading);
         setError(json.error ?? "Search failed, try again");
         return;
       }
       setCafes(rank(json.cafes.map((c) => ({ ...c, loading: !c.menu && !!c.token }))));
       for (const c of json.cafes) if (!c.menu && c.token) queue.current!.enqueue(c.placeId, c.token);
     } catch {
-      if (seq === searchSeq.current) setError("Search failed, try again");
+      if (seq === searchSeq.current) {
+        setCafes(stopLoading);
+        setError("Search failed, try again");
+      }
     } finally {
       if (seq === searchSeq.current) setSearching(false);
     }
