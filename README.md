@@ -4,7 +4,7 @@ Find a breakfast place for someone who does not eat eggs.
 
 Search a map for cafés and see each one's breakfast menu with the egg dishes already removed, ranked by how many real egg-free options it has. Built for Inga, because brunch menus are mostly eggs.
 
-> **Status:** design stage. This repository currently holds the architecture and plan; there is no application code yet. "Eggless" is a working name.
+> **Status:** Phase 0 spike done (go); Phase 1 MVP in design. Only the spike script exists so far. "Eggless" is a working name.
 
 ## How it works
 
@@ -65,13 +65,13 @@ Not runnable yet. Once the app is scaffolded, it will need:
 
 ## Roadmap
 
-- [ ] **Phase 0, spike:** script over about 20 Chiswick cafés to measure menu coverage and classification quality. Go/no-go for the rest.
+- [x] **Phase 0, spike:** script over about 20 Chiswick cafés to measure menu coverage and classification quality. Result: go, see [docs/SPIKE.md](docs/SPIKE.md).
 - [ ] **Phase 1, MVP:** search, extraction, storage, map and cards, deployed.
 - [ ] **Phase 2:** ranking polish, "this is wrong" overrides, nightly refresh, PWA, "near me".
 - [ ] **Phase 3:** image menus, rendering fallback, favourites, sharing.
 
 ## Next step
 
-Start with the spike in `scripts/spike.ts`. It needs only a Places key and an LLM key, no UI and no database, and it answers the one question that decides whether the idea works: how many local cafés publish a menu that can be read.
+Phase 1, MVP. The spike (`npm run spike`, needs `GOOGLE_PLACES_API_KEY` and `ANTHROPIC_API_KEY` in `.env.local`) proved the discovery and extraction approach; its logic moves into `lib/menu/`.
 
 Open design questions are listed at the end of the architecture document.

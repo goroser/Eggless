@@ -1,0 +1,37 @@
+{
+  "name": "eggless",
+  "version": "1.0.0",
+  "description": "Find a breakfast place for someone who does not eat eggs.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "spike": "tsx --env-file=.env.local scripts/spike.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/goroser/Eggless.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/goroser/Eggless/issues"
+  },
+  "homepage": "https://github.com/goroser/Eggless#readme",
+  "private": "true",
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.71",
+    "ai": "^7.0.127",
+    "cheerio": "^1.2.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
