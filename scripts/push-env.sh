@@ -23,7 +23,7 @@ for name in "${NAMES[@]}"; do
   fi
   npx --yes vercel@latest env rm "$name" production --yes >/dev/null 2>&1 || true
   # The CLI never echoes the value, so its output is safe to show on failure.
-  if out=$(printf '%s' "$value" | npx --yes vercel@latest env add "$name" production "${type_flag[@]}" 2>&1); then
+  if out=$(printf '%s' "$value" | npx --yes vercel@latest env add "$name" production ${type_flag[@]+"${type_flag[@]}"} 2>&1); then
     echo "set   $name"
   else
     echo "FAIL  $name: $(printf '%s' "$out" | grep -v '^\s*$' | tail -3 | tr '\n' ' ')"
