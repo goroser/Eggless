@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import { SKIP_HOSTS } from "@/lib/menu/fetch";
+import { isSkippedHost } from "@/lib/menu/fetch";
 
 export type Candidate = { url: string; score: number; why: "link" | "json-ld" | "raw-pdf" };
 
@@ -30,7 +30,7 @@ export function findCandidates(html: string, baseUrl: string): Candidate[] {
     } catch {
       return;
     }
-    if (!/^https?:$/.test(url.protocol) || SKIP_HOSTS.test(url.hostname)) return;
+    if (!/^https?:$/.test(url.protocol) || isSkippedHost(url.hostname)) return;
     url.hash = "";
     const text = `${label} ${url.pathname}`;
     let score = 0;

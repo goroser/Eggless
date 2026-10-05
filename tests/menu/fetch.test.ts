@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { createFetcher, fetchHome, isPrivateAddress, USER_AGENT } from "@/lib/menu/fetch";
+import { createFetcher, createSafeLookup, fetchHome, isPrivateAddress, isSkippedHost, USER_AGENT } from "@/lib/menu/fetch";
 import type { Fetched, MenuFetcher } from "@/lib/types";
 
 const publicLookup = async () => ["93.184.216.34"];
@@ -149,4 +149,66 @@ describe("fetchHome", () => {
     await fetchHome(fetcher, "https://cafe.example/");
     expect(fetcher).toHaveBeenCalledWith("https://cafe.example/", 2 * 1024 * 1024);
   });
+});
+
+describe("review fixes: address safety", () => {
+  test.each([
+    "::ffff:7f00:1",
+    "::7f00:1",
+    "::127.0.0.1",
+    "64:ff9b::a9fe:a9fe",
+    "fec0::1",
+    "2002:7f00:1::",
+    "ff02::1",
+    "192.0.0.1",
+    "198.18.0.1",
+    "100.64.0.1",
+  ])("%s is private", (ip) => {
+    expect(isPrivateAddress(ip)).toBe(true);
+  });
+
+  test.each([
+    "http://[::ffff:127.0.0.1]/",
+    "http://[::ffff:169.254.169.254]/",
+    "http://[::127.0.0.1]/",
+    "http://[64:ff9b::a9fe:a9fe]/",
+    "http://[fec0::1]/",
+    "http://[2002:7f00:1::]/",
+    "http://2130706433/",
+    "http://0x7f.1/",
+  ])("refuses the URL literal %s without fetching", async (url) => {
+    const fetchImpl = vi.fn();
+    const fetcher = createFetcher({ fetchImpl, lookup: publicLookup });
+    await expect(fetcher(url, 1000)).rejects.toThrow(/private address/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  test("connect-time lookup refuses a host that now resolves to a private address", async () => {
+    const lookup = createSafeLookup(async () => [{ address: "127.0.0.1", family: 4 }]);
+    const err = await new Promise<Error | null>((resolve) => lookup("rebind.example", {}, (e) => resolve(e)));
+    expect(err?.message).toMatch(/private address/);
+  });
+
+  test("connect-time lookup passes a public address to the socket", async () => {
+    const lookup = createSafeLookup(async () => [{ address: "93.184.216.34", family: 4 }]);
+    const got = await new Promise<unknown[]>((resolve) => lookup("cafe.example", {}, (...args) => resolve(args)));
+    expect(got).toEqual([null, "93.184.216.34", 4]);
+  });
+
+  test("connect-time lookup answers the all:true form", async () => {
+    const lookup = createSafeLookup(async () => [{ address: "93.184.216.34", family: 4 }]);
+    const got = await new Promise<unknown[]>((resolve) => lookup("cafe.example", { all: true }, (...args) => resolve(args)));
+    expect(got).toEqual([null, [{ address: "93.184.216.34", family: 4 }]]);
+  });
+});
+
+describe("review fixes: skipped hosts", () => {
+  test.each(["www.instagram.com", "deliveroo.co.uk", "x.com", "www.opentable.co.uk", "www.google.com", "exploretock.com", "resy.com"])(
+    "%s is skipped",
+    (h) => expect(isSkippedHost(h)).toBe(true),
+  );
+  test.each(["fox.com", "bistrox.com", "lux.community", "mytockcafe.com", "resyard.co.uk", "googlecafe.co.uk"])(
+    "%s is not skipped",
+    (h) => expect(isSkippedHost(h)).toBe(false),
+  );
 });

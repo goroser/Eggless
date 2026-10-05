@@ -1,12 +1,17 @@
 import { lookup as dnsLookup } from "node:dns/promises";
 import { isIP } from "node:net";
+import ipaddr from "ipaddr.js";
+import { Agent, fetch as undiciFetch } from "undici";
 import type { Fetched, MenuFetcher } from "@/lib/types";
 
 // ASCII only: some hosts (Wix) answer 403 to a non-ASCII User-Agent.
 export const USER_AGENT = "EgglessBot/0.1 (personal project; one fetch per cafe)";
 
-export const SKIP_HOSTS =
-  /deliveroo|ubereats|just-eat|justeat|instagram|facebook|tiktok|twitter|x\.com|opentable|resy|sevenrooms|exploretock|tock\.com|bookatable|designmynight|thefork|google\./i;
+// Delivery, social and booking sites: never a café's own menu. Matched on whole domain labels.
+const SKIP_HOSTS =
+  /(^|\.)(deliveroo|ubereats|just-eat|justeat|instagram|facebook|tiktok|twitter|opentable|resy|sevenrooms|exploretock|tock|bookatable|designmynight|thefork|google)\.[a-z.]+$|(^|\.)x\.com$/i;
+
+export const isSkippedHost = (hostname: string) => SKIP_HOSTS.test(hostname.replace(/\.$/, ""));
 
 const FETCH_TIMEOUT_MS = 8_000;
 const MAX_REDIRECTS = 5;
@@ -15,29 +20,42 @@ export const MAX_HTML_BYTES = 2 * 1024 * 1024;
 export const isPdf = (f: Fetched) => f.contentType.includes("pdf") || /\.pdf($|\?)/i.test(f.url);
 export const isImage = (f: Fetched) => /^image\/(jpeg|png|webp|gif)/.test(f.contentType);
 
-function isPrivateV4(ip: string): boolean {
-  const [a, b] = ip.split(".").map(Number);
-  return (
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    (a === 100 && b >= 64 && b <= 127) ||
-    a >= 224
-  );
+// Anything that is not plain public unicast is refused, including IPv4 hidden inside
+// IPv6 forms (::ffff:7f00:1, ::7f00:1, 64:ff9b::/96, 2002::/16) and reserved ranges.
+export function isPrivateAddress(ip: string): boolean {
+  if (!ipaddr.isValid(ip)) return true;
+  const addr = ipaddr.process(ip);
+  if (addr.kind() === "ipv6" && (addr as ipaddr.IPv6).parts.slice(0, 6).every((p) => p === 0)) return true;
+  return addr.range() !== "unicast";
 }
 
-export function isPrivateAddress(ip: string): boolean {
-  const kind = isIP(ip);
-  if (kind === 4) return isPrivateV4(ip);
-  if (kind !== 6) return true; // not an address we understand: refuse
-  const v6 = ip.toLowerCase();
-  const mapped = v6.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-  if (mapped) return isPrivateV4(mapped[1]);
-  return v6 === "::" || v6 === "::1" || /^f[cd]/.test(v6) || /^fe[89ab]/.test(v6);
+type Resolved = { address: string; family: number };
+type LookupCallback = (err: Error | null, address?: string | Resolved[], family?: number) => void;
+
+// Used by the socket itself, so the address that was checked is the address connected to
+// (no DNS-rebinding window between the check and the connection).
+export function createSafeLookup(resolve: (host: string) => Promise<Resolved[]>) {
+  return (hostname: string, options: { all?: boolean }, callback: LookupCallback) => {
+    resolve(hostname).then(
+      (records) => {
+        if (records.length === 0 || records.some((r) => isPrivateAddress(r.address))) {
+          callback(new Error(`private address for ${hostname}`));
+        } else if (options.all) {
+          callback(null, records);
+        } else {
+          callback(null, records[0].address, records[0].family);
+        }
+      },
+      (e: Error) => callback(e),
+    );
+  };
 }
+
+const resolveAll = async (host: string): Promise<Resolved[]> => dnsLookup(host, { all: true });
+
+const safeAgent = new Agent({ connect: { lookup: createSafeLookup(resolveAll) as never } });
+const safeFetch = ((url: string, init?: RequestInit) =>
+  undiciFetch(url, { ...(init as object), dispatcher: safeAgent } as never)) as unknown as typeof fetch;
 
 async function defaultLookup(host: string): Promise<string[]> {
   const records = await dnsLookup(host, { all: true });
@@ -48,12 +66,12 @@ export function createFetcher(deps: {
   fetchImpl?: typeof fetch;
   lookup?: (host: string) => Promise<string[]>;
 } = {}): MenuFetcher {
-  const fetchImpl = deps.fetchImpl ?? fetch;
+  const fetchImpl = deps.fetchImpl ?? safeFetch;
   const lookup = deps.lookup ?? defaultLookup;
 
   const checkTarget = async (url: URL) => {
     if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error(`unsupported protocol ${url.protocol}`);
-    if (SKIP_HOSTS.test(url.hostname)) throw new Error(`skipped host ${url.hostname}`);
+    if (isSkippedHost(url.hostname)) throw new Error(`skipped host ${url.hostname}`);
     const host = url.hostname.replace(/^\[|\]$/g, "");
     const addresses = isIP(host) ? [host] : await lookup(host);
     if (addresses.length === 0 || addresses.some(isPrivateAddress)) {
