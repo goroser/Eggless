@@ -35,6 +35,15 @@ export function EgglessApp() {
     if (history.state?.eggMap) history.back();
   }, []);
 
+  // A single-page app: the browser restoring an old scroll position after "back" would undo «Подробнее».
+  useEffect(() => {
+    try {
+      history.scrollRestoration = "manual";
+    } catch {
+      // unsupported; harmless
+    }
+  }, []);
+
   useEffect(() => {
     const onPop = () => {
       setFullscreen(false);

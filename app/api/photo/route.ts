@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db/client";
-import { handlePhoto } from "@/lib/handlers/photo";
+import { handlePhoto, PHOTO_REDIRECT_MAX_AGE } from "@/lib/handlers/photo";
 import { createPhotoLookup } from "@/lib/photos";
 
 export async function GET(req: Request) {
@@ -12,7 +12,7 @@ export async function GET(req: Request) {
     now: new Date(),
   });
   if (status === 302 && location) {
-    return new Response(null, { status: 302, headers: { Location: location, "Cache-Control": "private, max-age=3600" } });
+    return new Response(null, { status: 302, headers: { Location: location, "Cache-Control": `private, max-age=${PHOTO_REDIRECT_MAX_AGE}` } });
   }
   return new Response(null, { status });
 }

@@ -55,3 +55,23 @@ describe("ru", () => {
     expect(ru.privatePage).toBe("Это личная страница. Попросите у Романа ссылку.");
   });
 });
+
+describe("review fixes", () => {
+  test.each([
+    ["Served 8am - 11:30am", "завтраки до 11:30"],
+    ["Breakfast 8am–12pm", "завтраки до 12:00"],
+    ["Mon-Fri 7:30-11:30, Sat-Sun 8:00-12:00", "завтраки до 12:00"],
+    ["9am-3pm daily", "завтраки до 15:00"],
+    ["7 days a week until 11am", "завтраки до 11:00"],
+    ["until 11:30", "завтраки до 11:30"],
+  ])("servedUntil(%j) uses the end time", (text, out) => expect(ru.servedUntil(text)).toBe(out));
+
+  test("eggHidden agrees in number", () => {
+    expect(ru.eggHidden(1)).toBe("1 блюдо с яйцом скрыто");
+    expect(ru.eggHidden(2)).toBe("2 блюда с яйцом скрыты");
+    expect(ru.eggHidden(4)).toBe("4 блюда с яйцом скрыты");
+    expect(ru.eggHidden(5)).toBe("5 блюд с яйцом скрыто");
+    expect(ru.eggHidden(22)).toBe("22 блюда с яйцом скрыты");
+  });
+});
+

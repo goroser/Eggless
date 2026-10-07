@@ -3,12 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import type { PhotoRef } from "@/lib/types";
 
-type Shown = { src: string; large: string; attribution?: PhotoRef["attribution"]; key: string };
+type Shown = { src: string; attribution?: PhotoRef["attribution"]; key: string };
 
 const googleSrc = (ref: string, w: number) => `/api/photo?t=${encodeURIComponent(ref)}&w=${w}`;
 
 // Website share image first; Google photos only if that is missing or broken, and only once the card is on screen.
-export function CafePhotos({ imageUrl, photos, name }: { imageUrl: string | null; photos: PhotoRef[]; name: string }) {
+// `pending`: the menu (and so the website image) is still being read; Google is not asked until it is known.
+export function CafePhotos({
+  imageUrl,
+  photos,
+  name,
+  pending = false,
+}: {
+  imageUrl: string | null;
+  photos: PhotoRef[];
+  name: string;
+  pending?: boolean;
+}) {
   const [websiteFailed, setWebsiteFailed] = useState(false);
   const [visible, setVisible] = useState(false);
   const [failed, setFailed] = useState<Set<string>>(new Set());
@@ -16,7 +27,7 @@ export function CafePhotos({ imageUrl, photos, name }: { imageUrl: string | null
   const holder = useRef<HTMLDivElement>(null);
 
   const useWebsite = !!imageUrl && !websiteFailed;
-  const wantsGoogle = !useWebsite && photos.length > 0;
+  const wantsGoogle = !useWebsite && !pending && photos.length > 0;
 
   useEffect(() => {
     if (!wantsGoogle || visible || !holder.current) return;
@@ -31,11 +42,11 @@ export function CafePhotos({ imageUrl, photos, name }: { imageUrl: string | null
   }, [wantsGoogle, visible]);
 
   const shown: Shown[] = useWebsite
-    ? [{ src: imageUrl!, large: imageUrl!, key: "site" }]
+    ? [{ src: imageUrl!, key: "site" }]
     : visible
       ? photos
           .filter((p) => !failed.has(p.ref))
-          .map((p) => ({ src: googleSrc(p.ref, 400), large: googleSrc(p.ref, 800), attribution: p.attribution, key: p.ref }))
+          .map((p) => ({ src: googleSrc(p.ref, 400), attribution: p.attribution, key: p.ref }))
       : [];
 
   if (!useWebsite && !wantsGoogle) return null;
@@ -74,7 +85,27 @@ export function CafePhotos({ imageUrl, photos, name }: { imageUrl: string | null
       </div>
       {open && (
         <div role="dialog" aria-label={name} onClick={() => setOpen(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <img src={open.large} alt="" referrerPolicy="no-referrer" className="max-h-full max-w-full rounded-lg" />
+          {/* Same URL as the thumbnail: no second Google request, and nothing new to fail. */}
+          <figure className="relative m-0">
+            <img
+              src={open.src}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="max-h-[85dvh] max-w-full rounded-lg"
+              onError={() => setOpen(null)}
+            />
+            {open.attribution?.name && (
+              <a
+                href={open.attribution.uri || undefined}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="absolute inset-x-0 bottom-0 bg-black/50 px-2 py-1 text-xs text-white"
+              >
+                {open.attribution.name}
+              </a>
+            )}
+          </figure>
         </div>
       )}
     </>

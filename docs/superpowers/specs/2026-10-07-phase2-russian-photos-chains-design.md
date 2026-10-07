@@ -60,7 +60,7 @@ Decisions taken in conversation:
 | retry | Повторить |
 | showMenu / hideMenu | Всё меню / Свернуть |
 | askWithoutEgg | Попросите без яйца |
-| eggHidden(n) | `${n} ${plural(n, ["блюдо", "блюда", "блюд"])} с яйцом скрыто` |
+| eggHidden(n) | `${n} ${plural(n, ["блюдо", "блюда", "блюд"])} с яйцом ${plural(n, ["скрыто", "скрыты", "скрыто"])}` (e.g. «2 блюда с яйцом скрыты») |
 | openNow / closed | Открыто / Закрыто |
 | menuRead(date) | `Меню прочитано ${d} ${monthShort}` (e.g. «Меню прочитано 5 окт») |
 | servedUntil(time) | `завтраки до ${time}` |

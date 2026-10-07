@@ -18,7 +18,7 @@ export function MapPreview({ cafe, onMore }: { cafe: CafeState; onMore: () => vo
         <span className={cafe.menu?.status === "ok" ? "font-bold text-green-800" : "text-stone-500"}>{head.main}</span>
         {head.extra && <span className="ml-2 text-sm text-amber-700">{head.extra}</span>}
       </p>
-      <CafePhotos imageUrl={cafe.menu?.imageUrl ?? null} photos={cafe.photos.slice(0, 1)} name={cafe.name} />
+      <CafePhotos imageUrl={cafe.menu?.imageUrl ?? null} photos={cafe.photos.slice(0, 1)} name={cafe.name} pending={cafe.loading} />
       <button type="button" onClick={onMore} className="mt-3 text-sm font-medium text-stone-900 underline">
         {ru.more}
       </button>

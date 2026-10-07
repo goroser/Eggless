@@ -18,17 +18,21 @@ function londonDate(iso: string): { day: number; month: number } {
   return { day: get("day"), month: get("month") };
 }
 
-// "until 11:30", "till 11.30am", "until 12pm", "until 3:30 pm" → "HH:MM"; anything else → null.
+// The time breakfast ends: the last real time in the text, so ranges ("8am - 11:30am",
+// "Mon-Fri 7:30-11:30, Sat-Sun 8:00-12:00") give their end. A bare number ("7 days") is not a time.
 function parseTime(text: string): string | null {
-  const m = text.match(/\b(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)?\b/i);
-  if (!m || (!m[2] && !m[3])) return null;
-  let hours = Number(m[1]);
-  const minutes = m[2] ?? "00";
-  const meridiem = m[3]?.toLowerCase();
-  if (meridiem === "pm" && hours < 12) hours += 12;
-  if (meridiem === "am" && hours === 12) hours = 0;
-  if (hours > 23 || Number(minutes) > 59) return null;
-  return `${String(hours).padStart(2, "0")}:${minutes}`;
+  let last: string | null = null;
+  for (const m of text.matchAll(/\b(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)?\b/gi)) {
+    if (!m[2] && !m[3]) continue;
+    let hours = Number(m[1]);
+    const minutes = m[2] ?? "00";
+    const meridiem = m[3]?.toLowerCase();
+    if (meridiem === "pm" && hours < 12) hours += 12;
+    if (meridiem === "am" && hours === 12) hours = 0;
+    if (hours > 23 || Number(minutes) > 59) continue;
+    last = `${String(hours).padStart(2, "0")}:${minutes}`;
+  }
+  return last;
 }
 
 export const ru = {
@@ -62,7 +66,8 @@ export const ru = {
   footer: "Это фильтр по предпочтениям, а не по аллергенам. Мы читаем только то, что написано в меню.",
   options: (n: number) => `${n} без яиц`,
   adaptable: (n: number) => `+${n} можно без яйца`,
-  eggHidden: (n: number) => `${n} ${plural(n, ["блюдо", "блюда", "блюд"])} с яйцом скрыто`,
+  eggHidden: (n: number) =>
+    `${n} ${plural(n, ["блюдо", "блюда", "блюд"])} с яйцом ${plural(n, ["скрыто", "скрыты", "скрыто"])}`,
   menuRead: (iso: string) => {
     const { day, month } = londonDate(iso);
     return `Меню прочитано ${day} ${MONTHS[month - 1]}`;

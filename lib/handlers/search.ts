@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Db } from "@/lib/db/client";
 import { getCachedMenus, sharedDomains } from "@/lib/db/menus";
-import { isChain, siteDomain } from "@/lib/chains";
+import { isChain, isPlatformDomain, siteDomain } from "@/lib/chains";
 import { rankCafes } from "@/lib/menu/score";
 import { nearToRect, PlacesError, PlacesQuotaError, rectTooLarge, type Place, type SearchPlacesFn } from "@/lib/places";
 import { signPhotoRef, signToken } from "@/lib/token";
@@ -70,7 +70,10 @@ export async function handleSearch(body: unknown, deps: SearchDeps): Promise<{ s
   const cached = await getCachedMenus(deps.db, usable.map((p) => p.id), deps.now);
 
   // A website domain shared by two results here, or by two cafés already stored, marks a chain.
-  const domains = usable.map((p) => (p.websiteUri ? siteDomain(p.websiteUri) : null));
+  const domains = usable.map((p) => {
+    const d = p.websiteUri ? siteDomain(p.websiteUri) : null;
+    return d && !isPlatformDomain(d) ? d : null;
+  });
   const inSearch = new Map<string, number>();
   for (const d of domains) if (d) inSearch.set(d, (inSearch.get(d) ?? 0) + 1);
   const stored = await sharedDomains(deps.db, [...inSearch.keys()]);

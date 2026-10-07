@@ -169,5 +169,18 @@ describe("handleSearch", () => {
       expect(byId.r.photos).toEqual([]);
     });
   });
-});
 
+  test("cafés whose website is a social or link-in-bio page are not chains", async () => {
+    const out = await cafes(
+      run({ rect: RECT }, [
+        place("i1", { websiteUri: "https://www.instagram.com/cafe_one/" }),
+        place("i2", { websiteUri: "https://instagram.com/cafe_two" }),
+        place("l1", { websiteUri: "https://linktr.ee/cafeone" }),
+        place("l2", { websiteUri: "https://linktr.ee/cafetwo" }),
+        place("s1", { websiteUri: "https://sites.google.com/view/cafeone" }),
+        place("s2", { websiteUri: "https://sites.google.com/view/cafetwo" }),
+      ]).result,
+    );
+    expect(out.every((c) => !c.chain)).toBe(true);
+  });
+});

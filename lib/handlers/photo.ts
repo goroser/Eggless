@@ -10,6 +10,9 @@ export type PhotoDeps = {
   now: Date;
 };
 
+// Google photo URLs are short-lived and may not be stored; keep the redirect no longer than a photo ref lives.
+export const PHOTO_REDIRECT_MAX_AGE = 600;
+
 const clampWidth = (raw: string | null) => {
   const w = Number(raw);
   if (!raw || !Number.isFinite(w)) return 400;

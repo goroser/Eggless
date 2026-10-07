@@ -110,7 +110,7 @@ export function CafeCard({ cafe, onRetry, onSelect }: { cafe: CafeState; onRetry
         </div>
       </header>
 
-      <CafePhotos imageUrl={menu?.imageUrl ?? null} photos={cafe.photos} name={cafe.name} />
+      <CafePhotos imageUrl={menu?.imageUrl ?? null} photos={cafe.photos} name={cafe.name} pending={cafe.loading} />
 
       <p className={`mt-1 ${cafe.loading ? "animate-pulse text-stone-400" : ""}`}>
         <span className={isOk ? "text-lg font-bold text-green-800" : "text-stone-500"}>{head.main}</span>

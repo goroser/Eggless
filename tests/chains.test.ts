@@ -27,3 +27,12 @@ describe("normaliseName", () => {
     expect(normaliseName("Joe & The Juice")).toBe("joe the juice");
   });
 });
+
+describe("review fixes: names", () => {
+  test.each(["PAUL", "Paul Bakery Chiswick", "WatchHouse Bermondsey", "Harris + Hoole", "Notes"])("%s is a chain", (n) =>
+    expect(chain(n)).toBe(true));
+  test.each(["Paul Rothe & Son", "Notes from a Kitchen"])("%s is not", (n) => expect(chain(n)).toBe(false));
+  test("a delivery platform's store page is not a store finder", () =>
+    expect(chain("Local Café", "https://www.ubereats.com/gb/store/local-cafe/abc")).toBe(false));
+});
+

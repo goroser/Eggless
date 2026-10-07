@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { handlePhoto } from "@/lib/handlers/photo";
+import { handlePhoto, PHOTO_REDIRECT_MAX_AGE } from "@/lib/handlers/photo";
 import { incrementPhotoUsage } from "@/lib/db/photoUsage";
 import { signPhotoRef } from "@/lib/token";
 import type { Db } from "@/lib/db/client";
@@ -76,3 +76,8 @@ describe("incrementPhotoUsage", () => {
     expect(counts.sort()).toEqual([1, 2]);
   });
 });
+
+test("the photo redirect is cached no longer than a photo ref lives", () => {
+  expect(PHOTO_REDIRECT_MAX_AGE).toBeLessThanOrEqual(600);
+});
+

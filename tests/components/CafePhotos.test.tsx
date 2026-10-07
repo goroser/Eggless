@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { CafePhotos } from "@/components/CafePhotos";
 import { stubIntersectionObserver } from "../helpers/intersection";
@@ -74,5 +74,32 @@ describe("CafePhotos", () => {
     stubIntersectionObserver();
     const { container } = render(<CafePhotos imageUrl={null} photos={[]} name="Post Room" />);
     expect(container.innerHTML).toBe("");
+  });
+
+  test("no Google photos while the menu is still being read", () => {
+    const io = stubIntersectionObserver();
+    const { rerender } = render(<CafePhotos imageUrl={null} photos={photos} name="Post Room" pending />);
+    act(() => io.showAll());
+    expect(imgs()).toHaveLength(0);
+    rerender(<CafePhotos imageUrl="https://cafe.example/room.jpg" photos={photos} name="Post Room" />);
+    expect(imgs().map((i) => i.getAttribute("src"))).toEqual(["https://cafe.example/room.jpg"]);
+  });
+
+  test("opening a Google photo reuses the loaded image and keeps its attribution", () => {
+    const io = stubIntersectionObserver();
+    render(<CafePhotos imageUrl={null} photos={photos} name="Post Room" />);
+    act(() => io.showAll());
+    fireEvent.click(screen.getAllByRole("button", { name: /Post Room/ })[0]);
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.querySelector("img")?.getAttribute("src")).toBe("/api/photo?t=r1&w=400");
+    expect(within(dialog).getByText("Anna K")).toBeTruthy();
+  });
+
+  test("an image that fails in the large view closes it instead of showing a broken image", () => {
+    stubIntersectionObserver();
+    render(<CafePhotos imageUrl="https://cafe.example/room.jpg" photos={[]} name="Post Room" />);
+    fireEvent.click(screen.getByRole("button", { name: /Post Room/ }));
+    fireEvent.error(screen.getByRole("dialog").querySelector("img")!);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

@@ -122,4 +122,9 @@ describe("full-screen map", () => {
     expect(screen.getByRole("button", { name: "pin gails" }).getAttribute("data-chain")).toBe("true");
     expect(screen.getByRole("button", { name: "pin jajo" }).getAttribute("data-chain")).toBe("false");
   });
+
+  test("the page owns scroll position, so going back does not undo «Подробнее»", async () => {
+    await start();
+    expect(history.scrollRestoration).toBe("manual");
+  });
 });
