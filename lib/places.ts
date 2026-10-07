@@ -10,6 +10,7 @@ export type Place = {
   currentOpeningHours?: { openNow?: boolean };
   websiteUri?: string;
   servesBreakfast?: boolean;
+  photos?: { name: string; authorAttributions?: { displayName?: string; uri?: string }[] }[];
 };
 
 export class PlacesQuotaError extends Error {}
@@ -28,6 +29,7 @@ const FIELD_MASK = [
   "places.currentOpeningHours.openNow",
   "places.websiteUri",
   "places.servesBreakfast",
+  "places.photos",
 ].join(",");
 
 const toLatLng = (p: LatLng) => ({ latitude: p.lat, longitude: p.lng });

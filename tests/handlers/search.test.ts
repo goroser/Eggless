@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { handleSearch } from "@/lib/handlers/search";
 import { claimMenu, saveMenu } from "@/lib/db/menus";
 import { PlacesError, PlacesQuotaError, type Place } from "@/lib/places";
-import { verifyToken } from "@/lib/token";
+import { verifyPhotoRef, verifyToken } from "@/lib/token";
 import type { Db } from "@/lib/db/client";
 import type { CafeResult } from "@/lib/types";
 import { createTestDb } from "../db/testDb";
@@ -122,4 +122,52 @@ describe("handleSearch", () => {
   test("other Places failures are 502", async () => {
     expect((await run({ rect: RECT }, new PlacesError("boom")).result).status).toBe(502);
   });
+
+  describe("chains and photos", () => {
+    test("a listed name is a chain", async () => {
+      const out = await cafes(run({ rect: RECT }, [place("g", { displayName: { text: "GAIL's Bakery Chiswick" } }), place("l")]).result);
+      expect(Object.fromEntries(out.map((c) => [c.placeId, c.chain]))).toEqual({ g: true, l: false });
+    });
+
+    test("two results sharing a website domain are chains", async () => {
+      const out = await cafes(
+        run({ rect: RECT }, [
+          place("a", { websiteUri: "https://www.brunchco.example/chiswick" }),
+          place("b", { websiteUri: "https://brunchco.example/ealing" }),
+          place("c"),
+        ]).result,
+      );
+      expect(Object.fromEntries(out.map((c) => [c.placeId, c.chain]))).toEqual({ a: true, b: true, c: false });
+    });
+
+    test("a domain already stored for two places makes a chain", async () => {
+      for (const id of ["x1", "x2"]) {
+        await claimMenu(db, id, NOW);
+        await saveMenu(
+          db,
+          id,
+          { status: "no_menu_found", sourceUrl: null, sourceType: null, sources: [], contentHash: null, servedUntil: null,
+            dishes: [], counts: null, model: null, promptVersion: null, imageUrl: null, siteDomain: "smallchain.example" },
+          NOW,
+        );
+      }
+      const out = await cafes(run({ rect: RECT }, [place("new", { websiteUri: "https://smallchain.example/w4" })]).result);
+      expect(out[0].chain).toBe(true);
+    });
+
+    test("up to two signed photo refs with attribution", async () => {
+      const photos = [1, 2, 3].map((i) => ({
+        name: `places/p/photos/ph${i}`,
+        authorAttributions: [{ displayName: `Author ${i}`, uri: `https://maps.google.com/contrib/${i}` }],
+      }));
+      const out = await cafes(run({ rect: RECT }, [place("p", { photos }), place("q", { photos: [{ name: "places/q/photos/x" }] }), place("r")]).result);
+      const byId = Object.fromEntries(out.map((c) => [c.placeId, c]));
+      expect(byId.p.photos).toHaveLength(2);
+      expect(verifyPhotoRef(byId.p.photos[0].ref, SECRET, NOW.getTime())).toBe("places/p/photos/ph1");
+      expect(byId.p.photos[1].attribution).toEqual({ name: "Author 2", uri: "https://maps.google.com/contrib/2" });
+      expect(byId.q.photos[0].attribution).toEqual({ name: "", uri: "" });
+      expect(byId.r.photos).toEqual([]);
+    });
+  });
 });
+

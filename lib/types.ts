@@ -46,4 +46,9 @@ export type CafeResult = {
   googleMapsUri: string;
   menu: MenuSummary | null;
   token?: string;
+  chain: boolean;
+  photos: PhotoRef[];
 };
+
+// A Google photo the browser may request through /api/photo; never stored.
+export type PhotoRef = { ref: string; attribution: { name: string; uri: string } };

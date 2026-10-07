@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { signToken, verifyToken } from "@/lib/token";
+import { signPhotoRef, signToken, verifyPhotoRef, verifyToken } from "@/lib/token";
 
 const SECRET = "s".repeat(32);
 const NOW = 1_780_000_000_000;
@@ -31,3 +31,12 @@ describe("tokens", () => {
     expect(verifyToken(t, SECRET, NOW)).toBeNull();
   });
 });
+
+describe("photo refs", () => {
+  const NAME = "places/ChIJabc/photos/AUc7xyz";
+  test("round trip", () => expect(verifyPhotoRef(signPhotoRef(NAME, SECRET, NOW), SECRET, NOW + 1000)).toBe(NAME));
+  test("expires after 10 minutes", () => expect(verifyPhotoRef(signPhotoRef(NAME, SECRET, NOW), SECRET, NOW + 601_000)).toBeNull());
+  test("a menu token is not a photo ref", () => expect(verifyPhotoRef(signToken(payload, SECRET, NOW), SECRET, NOW)).toBeNull());
+  test("a photo ref is not a menu token", () => expect(verifyToken(signPhotoRef(NAME, SECRET, NOW), SECRET, NOW)).toBeNull());
+});
+

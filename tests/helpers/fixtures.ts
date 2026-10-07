@@ -29,6 +29,8 @@ export const cafe = (id: string, counts: Partial<Counts> | null, over: Partial<C
   name: id,
   location: { lat: 51.49, lng: -0.26 },
   googleMapsUri: `https://maps.google.com/?cid=${id}`,
+  chain: false,
+  photos: [],
   menu: counts ? summary({ counts: { options: 0, adaptable: 0, eggMain: 0, total: 1, ...counts } }) : null,
   ...over,
 });
