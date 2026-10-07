@@ -127,4 +127,39 @@ describe("collectSources", () => {
     expect(r.sources.pdfs).toHaveLength(2);
     expect(r.sources.pdfs.reduce((n, p) => n + p.data.length, 0)).toBeLessThanOrEqual(20 * MB);
   });
+
+  describe("share image", () => {
+    const home = (img: string) =>
+      html(`<head><meta property="og:image" content="${img}"></head><p>${words(80)}</p>`);
+
+    test("a good og:image is kept", async () => {
+      const { fetcher } = fixtureFetcher({
+        "https://www.cafe.example/": home("https://www.cafe.example/room.jpg"),
+        "https://www.cafe.example/room.jpg": jpeg(100_000),
+      });
+      const r = await collectSources(fetcher, "https://www.cafe.example/");
+      if (r.kind !== "sources") throw new Error("expected sources");
+      expect(r.imageUrl).toBe("https://www.cafe.example/room.jpg");
+      expect(r.siteDomain).toBe("cafe.example");
+    });
+
+    test("a tiny image is dropped", async () => {
+      const { fetcher } = fixtureFetcher({
+        "https://cafe.example/": home("https://cafe.example/room.jpg"),
+        "https://cafe.example/room.jpg": jpeg(10_000),
+      });
+      const r = await collectSources(fetcher, "https://cafe.example/");
+      if (r.kind !== "sources") throw new Error("expected sources");
+      expect(r.imageUrl).toBeNull();
+    });
+
+    test("an image that fails to load is dropped and the menu is unaffected", async () => {
+      const { fetcher } = fixtureFetcher({ "https://cafe.example/": home("https://cafe.example/gone.jpg") });
+      const r = await collectSources(fetcher, "https://cafe.example/");
+      if (r.kind !== "sources") throw new Error("expected sources");
+      expect(r.imageUrl).toBeNull();
+      expect(r.sources.texts).toHaveLength(1);
+    });
+  });
 });
+

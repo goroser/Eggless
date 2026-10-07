@@ -35,7 +35,7 @@ function contentHash({ texts, pdfs, images }: Sources): string {
   return h.digest("hex");
 }
 
-const failure = (status: "no_menu_found" | "fetch_failed", sources: string[]): SaveInput => ({
+const failure = (status: "no_menu_found" | "fetch_failed", sources: string[], siteDomain: string | null = null): SaveInput => ({
   status,
   sourceUrl: null,
   sourceType: null,
@@ -47,7 +47,7 @@ const failure = (status: "no_menu_found" | "fetch_failed", sources: string[]): S
   model: null,
   promptVersion: null,
   imageUrl: null,
-  siteDomain: null,
+  siteDomain,
 });
 
 export async function handleMenu(body: unknown, deps: MenuDeps): Promise<{ status: number; json: unknown }> {
@@ -65,7 +65,7 @@ export async function handleMenu(body: unknown, deps: MenuDeps): Promise<{ statu
   try {
     const collected = await collectSources(deps.fetcher, websiteUri, { deadline: Date.now() + budgets.collectMs });
     if (collected.kind === "none") {
-      return { status: 200, json: await saveMenu(deps.db, placeId, failure(collected.status, collected.sourceUrls), deps.now) };
+      return { status: 200, json: await saveMenu(deps.db, placeId, failure(collected.status, collected.sourceUrls, collected.siteDomain), deps.now) };
     }
 
     const signal = AbortSignal.timeout(budgets.extractMs);
@@ -76,7 +76,7 @@ export async function handleMenu(body: unknown, deps: MenuDeps): Promise<{ statu
       if (!signal.aborted && !isCafeAttributableLlmError(e)) throw e;
       // Too slow or unreadable: the café's content is the problem, so remember it for a week.
       console.error(`menu extraction failed for ${placeId}:`, e);
-      return { status: 200, json: await saveMenu(deps.db, placeId, failure("fetch_failed", collected.sourceUrls), deps.now) };
+      return { status: 200, json: await saveMenu(deps.db, placeId, failure("fetch_failed", collected.sourceUrls, collected.siteDomain), deps.now) };
     }
 
     const dishes = filterDishes(extracted.dishes);
@@ -95,8 +95,8 @@ export async function handleMenu(body: unknown, deps: MenuDeps): Promise<{ statu
         counts,
         model: deps.model,
         promptVersion: PROMPT_VERSION,
-        imageUrl: null,
-        siteDomain: null,
+        imageUrl: collected.imageUrl,
+        siteDomain: collected.siteDomain,
       },
       deps.now,
     );

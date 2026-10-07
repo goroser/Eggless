@@ -1,6 +1,8 @@
 import type { Fetched, MenuFetcher } from "@/lib/types";
 import { fetchHome, isImage, isPdf, MAX_HTML_BYTES } from "@/lib/menu/fetch";
 import { findCandidates, findMenuImages, htmlToText, type Candidate } from "@/lib/menu/discover";
+import { findShareImage } from "@/lib/menu/image";
+import { siteDomain } from "@/lib/chains";
 
 export type Sources = {
   texts: { url: string; text: string }[];
@@ -9,12 +11,21 @@ export type Sources = {
 };
 
 export type CollectResult =
-  | { kind: "sources"; sources: Sources; sourceUrls: string[]; primaryUrl: string; sourceType: "html" | "pdf" | "image" }
-  | { kind: "none"; status: "no_menu_found" | "fetch_failed"; sourceUrls: string[]; note: string };
+  | {
+      kind: "sources";
+      sources: Sources;
+      sourceUrls: string[];
+      primaryUrl: string;
+      sourceType: "html" | "pdf" | "image";
+      imageUrl: string | null;
+      siteDomain: string | null;
+    }
+  | { kind: "none"; status: "no_menu_found" | "fetch_failed"; sourceUrls: string[]; note: string; siteDomain: string | null };
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MIN_IMAGE_BYTES = 60 * 1024;
+const MIN_SHARE_IMAGE_BYTES = 30 * 1024;
 const MAX_PDFS = 3;
 const MAX_TOTAL_PDF_BYTES = 20 * 1024 * 1024; // base64 inflates by a third; Anthropic caps requests at 32 MB
 const MAX_IMAGES = 4;
@@ -49,7 +60,7 @@ export async function collectSources(
   try {
     home = await fetchHome(fetcher, websiteUri);
   } catch (e) {
-    return { kind: "none", status: "fetch_failed", sourceUrls: [], note: (e as Error).message };
+    return { kind: "none", status: "fetch_failed", sourceUrls: [], note: (e as Error).message, siteDomain: null };
   }
 
   const texts: Sources["texts"] = [];
@@ -57,6 +68,7 @@ export async function collectSources(
   const images: Sources["images"] = [];
   const seen = new Set([websiteUri, home.url]);
   const menuPages: Page[] = [];
+  let shareImage: string | null = null;
 
   // Fetch one candidate; returns the page when it is HTML so the caller can look one hop deeper.
   const visit = async (c: Candidate): Promise<Page | null> => {
@@ -83,6 +95,7 @@ export async function collectSources(
     const page = readPage(home);
     if (page) {
       texts.push({ url: page.url, text: page.text });
+      shareImage = findShareImage(page.html, page.url);
       for (const c of findCandidates(page.html, page.url).slice(0, CANDIDATES_PER_HOP)) {
         const p = await visit(c);
         if (p) menuPages.push(p);
@@ -123,7 +136,7 @@ export async function collectSources(
   const sourceUrls = [...texts.map((t) => t.url), ...bestPdfs.map((p) => p.url), ...images.map((i) => i.url)];
   const textChars = texts.reduce((n, t) => n + t.text.length, 0);
   if (bestPdfs.length === 0 && images.length === 0 && textChars < MIN_TOTAL_TEXT) {
-    return { kind: "none", status: "no_menu_found", sourceUrls, note: "almost no readable text" };
+    return { kind: "none", status: "no_menu_found", sourceUrls, note: "almost no readable text", siteDomain: siteDomain(home.url) };
   }
 
   const bestMenuPage = menuPages.find((p) => p.text.length > MIN_PAGE_TEXT || images.length > 0);
@@ -139,5 +152,17 @@ export async function collectSources(
     sourceUrls,
     primaryUrl,
     sourceType,
+    imageUrl: shareImage ? await checkImage(fetcher, shareImage) : null,
+    siteDomain: siteDomain(home.url),
   };
+}
+
+// The share image is shown straight from the café's site, so only check that it is a real, decent-sized image.
+async function checkImage(fetcher: MenuFetcher, url: string): Promise<string | null> {
+  try {
+    const f = await fetcher(url, MAX_IMAGE_BYTES);
+    return isImage(f) && f.body.length >= MIN_SHARE_IMAGE_BYTES ? url : null;
+  } catch {
+    return null;
+  }
 }
