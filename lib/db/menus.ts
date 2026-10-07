@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, countDistinct, eq, gt, gte, inArray, ne, sql } from "drizzle-orm";
 import type { Db } from "@/lib/db/client";
 import { dishes, menus } from "@/lib/db/schema";
 import type { Counts, Dish, EggStatus, MenuStatus, MenuSummary } from "@/lib/types";
@@ -14,6 +14,8 @@ export type SaveInput = {
   counts: Counts | null;
   model: string | null;
   promptVersion: number | null;
+  imageUrl: string | null;
+  siteDomain: string | null;
 };
 
 const DAY_MS = 86_400_000;
@@ -37,10 +39,13 @@ function toSummary(m: MenuRow, ds: DishRow[]): MenuSummary {
     servedUntil: m.servedUntil,
     sourceUrl: m.sourceUrl,
     extractedAt: m.extractedAt ? new Date(m.extractedAt).toISOString() : null,
+    imageUrl: m.imageUrl,
     dishes: ds.map((d) => ({
       section: d.section,
       name: d.name,
+      nameRu: d.nameRu,
       description: d.description,
+      descriptionRu: d.descriptionRu,
       price: d.price,
       eggStatus: d.eggStatus as EggStatus,
       eggEvidence: d.eggEvidence,
@@ -97,6 +102,8 @@ export async function saveMenu(db: Db, placeId: string, input: SaveInput, now: D
     totalCount: input.counts?.total ?? null,
     model: input.model,
     promptVersion: input.promptVersion,
+    imageUrl: input.imageUrl,
+    siteDomain: input.siteDomain,
     claimedAt: null,
     extractedAt: now,
     expiresAt: expiryFor(input.status, now),
@@ -120,4 +127,16 @@ export async function saveMenu(db: Db, placeId: string, input: SaveInput, now: D
 
 export async function releaseClaim(db: Db, placeId: string): Promise<void> {
   await db.delete(menus).where(and(eq(menus.placeId, placeId), eq(menus.status, "pending")));
+}
+
+// Website domains already stored for two or more different cafés: a sign of a chain.
+export async function sharedDomains(db: Db, domains: string[]): Promise<Set<string>> {
+  if (domains.length === 0) return new Set();
+  const rows = await db
+    .select({ domain: menus.siteDomain })
+    .from(menus)
+    .where(inArray(menus.siteDomain, domains))
+    .groupBy(menus.siteDomain)
+    .having(gte(countDistinct(menus.placeId), 2));
+  return new Set(rows.map((r) => r.domain!).filter(Boolean));
 }

@@ -21,6 +21,7 @@ const NO_WEBSITE: MenuSummary = {
   servedUntil: null,
   sourceUrl: null,
   extractedAt: null,
+  imageUrl: null,
   dishes: [],
 };
 

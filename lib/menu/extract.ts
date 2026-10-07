@@ -4,14 +4,23 @@ import { z } from "zod";
 import type { ExtractedMenu } from "@/lib/types";
 import type { Sources } from "@/lib/menu/collect";
 
-export const PROMPT_VERSION = 1;
+export const PROMPT_VERSION = 2;
 export const DEFAULT_MODEL = "claude-haiku-4-5";
 const MAX_TEXT_CHARS = 40_000;
 
 const DishSchema = z.object({
   section: z.string().describe("Menu section heading as written, or empty string"),
   name: z.string().describe("Dish name copied verbatim from the menu"),
+  nameRu: z
+    .string()
+    .describe(
+      "The dish name in natural Russian, as a Russian speaker would say it in a café. Keep brand and proper names " +
+        "(e.g. \"Eggs Benedict\" → «Яйца Бенедикт», \"Full English\" → «Полный английский завтрак»). Never add information.",
+    ),
   description: z.string().describe("Dish description copied verbatim, or empty string"),
+  descriptionRu: z
+    .string()
+    .describe("The full description translated into natural Russian, or empty string when there is no description. Never add information."),
   price: z.string().describe("Price as written, or empty string"),
   eggStatus: z
     .enum(["egg_main", "egg_component", "no_egg"])

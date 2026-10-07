@@ -3,7 +3,9 @@ import type { CafeResult, Counts, Dish, MenuSummary } from "@/lib/types";
 export const dish = (name: string, over: Partial<Dish> = {}): Dish => ({
   section: "Breakfast",
   name,
+  nameRu: "",
   description: "",
+  descriptionRu: "",
   price: "",
   eggStatus: "no_egg",
   eggEvidence: "",
@@ -17,6 +19,7 @@ export const summary = (over: Partial<MenuSummary> = {}): MenuSummary => ({
   servedUntil: null,
   sourceUrl: "https://cafe.example/menu",
   extractedAt: "2026-10-05T09:00:00.000Z",
+  imageUrl: null,
   dishes: [],
   ...over,
 });

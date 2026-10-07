@@ -8,7 +8,9 @@ export type EggStatus = "egg_main" | "egg_component" | "no_egg";
 export type Dish = {
   section: string;
   name: string;
+  nameRu: string; // "" when not translated
   description: string;
+  descriptionRu: string;
   price: string;
   eggStatus: EggStatus;
   eggEvidence: string;
@@ -27,6 +29,7 @@ export type MenuSummary = {
   servedUntil: string | null;
   sourceUrl: string | null;
   extractedAt: string | null;
+  imageUrl: string | null;
   dishes: Dish[];
 };
 

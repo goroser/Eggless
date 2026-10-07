@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
+import { z } from "zod";
 import { APICallError, LoadAPIKeyError, NoObjectGeneratedError, RetryError } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
-import { createExtractor, isCafeAttributableLlmError, PROMPT_VERSION } from "@/lib/menu/extract";
+import { createExtractor, isCafeAttributableLlmError, MenuSchema, PROMPT_VERSION } from "@/lib/menu/extract";
 import type { ExtractedMenu } from "@/lib/types";
 
 const menu: ExtractedMenu = {
@@ -9,7 +10,17 @@ const menu: ExtractedMenu = {
   hasBreakfast: true,
   servedUntil: "until 11:30",
   dishes: [
-    { section: "Breakfast", name: "Porridge", description: "oats", price: "£6", eggStatus: "no_egg", eggEvidence: "", substantial: true },
+    {
+      section: "Breakfast",
+      name: "Porridge",
+      nameRu: "Овсянка",
+      description: "oats",
+      descriptionRu: "овсяные хлопья",
+      price: "£6",
+      eggStatus: "no_egg",
+      eggEvidence: "",
+      substantial: true,
+    },
   ],
 };
 
@@ -53,7 +64,16 @@ describe("createExtractor", () => {
     expect(m.doGenerateCalls[0].temperature).toBe(0);
   });
 
-  test("prompt version is 1", () => expect(PROMPT_VERSION).toBe(1));
+  test("prompt version is 2", () => expect(PROMPT_VERSION).toBe(2));
+
+  test("a dish without a Russian name is rejected", () => {
+    const { nameRu: _omit, ...withoutRu } = menu.dishes[0];
+    expect(MenuSchema.safeParse({ ...menu, dishes: [withoutRu] }).success).toBe(false);
+  });
+
+  test("the schema tells the model how to translate", () => {
+    expect(JSON.stringify(z.toJSONSchema(MenuSchema))).toContain("Яйца Бенедикт");
+  });
 });
 
 describe("isCafeAttributableLlmError", () => {

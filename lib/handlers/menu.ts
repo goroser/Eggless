@@ -46,6 +46,8 @@ const failure = (status: "no_menu_found" | "fetch_failed", sources: string[]): S
   counts: null,
   model: null,
   promptVersion: null,
+  imageUrl: null,
+  siteDomain: null,
 });
 
 export async function handleMenu(body: unknown, deps: MenuDeps): Promise<{ status: number; json: unknown }> {
@@ -93,6 +95,8 @@ export async function handleMenu(body: unknown, deps: MenuDeps): Promise<{ statu
         counts,
         model: deps.model,
         promptVersion: PROMPT_VERSION,
+        imageUrl: null,
+        siteDomain: null,
       },
       deps.now,
     );

@@ -54,7 +54,7 @@ describe("handleMenu", () => {
       db,
       "p1",
       { status: "ok", sourceUrl: SITE, sourceType: "html", sources: [], contentHash: null, servedUntil: null,
-        dishes: [dish("Toast")], counts: { options: 1, adaptable: 0, eggMain: 0, total: 1 }, model: "m", promptVersion: 1 },
+        dishes: [dish("Toast")], counts: { options: 1, adaptable: 0, eggMain: 0, total: 1 }, model: "m", promptVersion: 1, imageUrl: null, siteDomain: null },
       NOW,
     );
     const extract = vi.fn();
@@ -75,7 +75,7 @@ describe("handleMenu", () => {
     expect(s.servedUntil).toBe("until 11:30");
     expect(s.sourceUrl).toBe("https://cafe.example/breakfast");
     const saved = await row("p1");
-    expect(saved).toMatchObject({ model: "claude-haiku-4-5", prompt_version: 1, source_type: "html" });
+    expect(saved).toMatchObject({ model: "claude-haiku-4-5", prompt_version: 2, source_type: "html" });
     expect(saved.sources).toEqual([SITE, "https://cafe.example/breakfast"]);
     expect(String(saved.content_hash)).toMatch(/^[0-9a-f]{64}$/);
     expect(new Date(String(saved.expires_at)).getTime()).toBe(NOW.getTime() + 30 * DAY);
