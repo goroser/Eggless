@@ -9,9 +9,10 @@ import { countDishes, menuStatus } from "@/lib/menu/score";
 import { verifyToken } from "@/lib/token";
 import type { ExtractedMenu, MenuFetcher } from "@/lib/types";
 
-// Collection plus extraction must finish inside the route's 60 s limit. A fetch started just
-// before the collect deadline can run 8 s past it.
-const DEFAULT_BUDGETS = { collectMs: 20_000, extractMs: 25_000 };
+// Collection plus extraction must finish inside the route's maxDuration (a fetch started just before
+// the collect deadline can run 8 s past it). A full all-day menu with Russian takes ~25 s to extract,
+// so extraction gets 90 s: a timeout should mean a genuinely unreadable menu, not a long one.
+export const DEFAULT_BUDGETS = { collectMs: 20_000, extractMs: 90_000 };
 
 export type MenuDeps = {
   db: Db;

@@ -84,8 +84,10 @@ export async function collectSources(
       const page = readPage(f);
       if (page && page.text.length > MIN_PAGE_TEXT) texts.push({ url: page.url, text: page.text });
       return page;
-    } catch {
-      return null; // a dead candidate link is fine; others may work
+    } catch (e) {
+      // A dead candidate link is fine (others may work); logged so a missing menu can be explained.
+      console.warn(`menu candidate failed: ${c.url}: ${(e as Error).message}`);
+      return null;
     }
   };
 
