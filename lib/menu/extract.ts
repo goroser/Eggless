@@ -67,7 +67,7 @@ Rules:
 
 export type ExtractFn = (sources: Sources, opts?: { abortSignal?: AbortSignal }) => Promise<ExtractedMenu>;
 
-function defaultModel(): LanguageModel {
+export function defaultModel(): LanguageModel {
   const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID;
   // The workspace header is needed only when the API key is not scoped to a workspace.
   const anthropic = createAnthropic(workspaceId ? { headers: { "anthropic-workspace-id": workspaceId } } : {});
