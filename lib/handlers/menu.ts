@@ -9,9 +9,10 @@ import { countDishes, menuStatus } from "@/lib/menu/score";
 import { verifyToken } from "@/lib/token";
 import type { ExtractedMenu, MenuFetcher } from "@/lib/types";
 
-// Collection plus extraction must finish inside the route's 60 s limit. A fetch started just
-// before the collect deadline can run 8 s past it.
-const DEFAULT_BUDGETS = { collectMs: 20_000, extractMs: 25_000 };
+// Collection plus extraction must finish inside the route's maxDuration (a fetch started just before
+// the collect deadline can run 8 s past it). A full all-day menu with Russian takes ~25 s to extract,
+// so extraction gets 90 s: a timeout should mean a genuinely unreadable menu, not a long one.
+export const DEFAULT_BUDGETS = { collectMs: 20_000, extractMs: 90_000 };
 
 export type MenuDeps = {
   db: Db;
@@ -35,7 +36,7 @@ function contentHash({ texts, pdfs, images }: Sources): string {
   return h.digest("hex");
 }
 
-const failure = (status: "no_menu_found" | "fetch_failed", sources: string[]): SaveInput => ({
+const failure = (status: "no_menu_found" | "fetch_failed", sources: string[], siteDomain: string | null = null): SaveInput => ({
   status,
   sourceUrl: null,
   sourceType: null,
@@ -46,6 +47,8 @@ const failure = (status: "no_menu_found" | "fetch_failed", sources: string[]): S
   counts: null,
   model: null,
   promptVersion: null,
+  imageUrl: null,
+  siteDomain,
 });
 
 export async function handleMenu(body: unknown, deps: MenuDeps): Promise<{ status: number; json: unknown }> {
@@ -63,7 +66,7 @@ export async function handleMenu(body: unknown, deps: MenuDeps): Promise<{ statu
   try {
     const collected = await collectSources(deps.fetcher, websiteUri, { deadline: Date.now() + budgets.collectMs });
     if (collected.kind === "none") {
-      return { status: 200, json: await saveMenu(deps.db, placeId, failure(collected.status, collected.sourceUrls), deps.now) };
+      return { status: 200, json: await saveMenu(deps.db, placeId, failure(collected.status, collected.sourceUrls, collected.siteDomain), deps.now) };
     }
 
     const signal = AbortSignal.timeout(budgets.extractMs);
@@ -74,7 +77,7 @@ export async function handleMenu(body: unknown, deps: MenuDeps): Promise<{ statu
       if (!signal.aborted && !isCafeAttributableLlmError(e)) throw e;
       // Too slow or unreadable: the café's content is the problem, so remember it for a week.
       console.error(`menu extraction failed for ${placeId}:`, e);
-      return { status: 200, json: await saveMenu(deps.db, placeId, failure("fetch_failed", collected.sourceUrls), deps.now) };
+      return { status: 200, json: await saveMenu(deps.db, placeId, failure("fetch_failed", collected.sourceUrls, collected.siteDomain), deps.now) };
     }
 
     const dishes = filterDishes(extracted.dishes);
@@ -93,6 +96,8 @@ export async function handleMenu(body: unknown, deps: MenuDeps): Promise<{ statu
         counts,
         model: deps.model,
         promptVersion: PROMPT_VERSION,
+        imageUrl: collected.imageUrl,
+        siteDomain: collected.siteDomain,
       },
       deps.now,
     );

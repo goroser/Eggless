@@ -24,8 +24,8 @@ describe("EgglessApp", () => {
   test("an empty search says no cafés were found", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ cafes: [] })));
     render(<EgglessApp />);
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Search this area" })));
-    expect(await screen.findByText("No cafés found here")).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Искать здесь" })));
+    expect(await screen.findByText("Здесь не нашлось кафе")).toBeTruthy();
   });
 
   test("denied location explains what to do instead", async () => {
@@ -33,7 +33,7 @@ describe("EgglessApp", () => {
       geolocation: { getCurrentPosition: (_ok: unknown, fail: (e: unknown) => void) => fail({ code: 1 }) },
     });
     render(<EgglessApp />);
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Near me" })));
-    expect(screen.getByText("Location is off; pan the map and tap Search this area")).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Рядом со мной" })));
+    expect(screen.getByText("Геолокация выключена — передвиньте карту и нажмите «Искать здесь»")).toBeTruthy();
   });
 });

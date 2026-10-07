@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import { sql } from "drizzle-orm";
-import { claimMenu, expiryFor, getCachedMenus, releaseClaim, saveMenu, type SaveInput } from "@/lib/db/menus";
+import { claimMenu, expiryFor, getCachedMenus, releaseClaim, saveMenu, sharedDomains, type SaveInput } from "@/lib/db/menus";
 import type { Db } from "@/lib/db/client";
 import { createTestDb } from "./testDb";
+import { PROMPT_VERSION } from "@/lib/menu/version";
 import { dish } from "../helpers/fixtures";
 
 const T0 = new Date("2026-10-05T09:00:00.000Z");
@@ -19,7 +20,9 @@ const okInput = (names: string[]): SaveInput => ({
   dishes: names.map((n) => dish(n)),
   counts: { options: names.length, adaptable: 0, eggMain: 0, total: names.length },
   model: "claude-haiku-4-5",
-  promptVersion: 1,
+  promptVersion: 3,
+  imageUrl: null,
+  siteDomain: "cafe.example",
 });
 
 let db: Db;
@@ -118,3 +121,64 @@ describe("releaseClaim", () => {
     expect((await getCachedMenus(db, ["saved"], at(1000))).has("saved")).toBe(true);
   });
 });
+
+describe("Phase 2 columns", () => {
+  test("Russian names, descriptions and the image round-trip", async () => {
+    await claimMenu(db, "p1", T0);
+    await saveMenu(
+      db,
+      "p1",
+      { ...okInput([]), dishes: [dish("Porridge", { nameRu: "Овсянка", description: "oats", descriptionRu: "овсяные хлопья" })], imageUrl: "https://cafe.example/room.jpg" },
+      T0,
+    );
+    const m = (await getCachedMenus(db, ["p1"], at(1000))).get("p1")!;
+    expect(m.dishes[0]).toMatchObject({ nameRu: "Овсянка", descriptionRu: "овсяные хлопья" });
+    expect(m.imageUrl).toBe("https://cafe.example/room.jpg");
+  });
+
+  test("a dish written without the new columns reads back untranslated", async () => {
+    await claimMenu(db, "p1", T0);
+    await saveMenu(db, "p1", okInput([]), T0);
+    await db.execute(
+      sql`insert into dishes (place_id, position, section, name, description, price, egg_status, egg_evidence, substantial)
+          values ('p1', 0, 'Breakfast', 'Toast', '', '', 'no_egg', '', true)`,
+    );
+    const m = (await getCachedMenus(db, ["p1"], at(1000))).get("p1")!;
+    expect(m.dishes[0]).toMatchObject({ name: "Toast", nameRu: "", descriptionRu: "" });
+  });
+
+  test("sharedDomains finds domains used by two or more places", async () => {
+    for (const [id, domain] of [["a1", "a.com"], ["a2", "a.com"], ["b1", "b.com"]]) {
+      await claimMenu(db, id, T0);
+      await saveMenu(db, id, { ...okInput(["X"]), siteDomain: domain }, T0);
+    }
+    expect(await sharedDomains(db, ["a.com", "b.com", "c.com"])).toEqual(new Set(["a.com"]));
+    expect(await sharedDomains(db, [])).toEqual(new Set());
+  });
+});
+
+describe("prompt version freshness", () => {
+  const atVersion = (v: number | null, status: SaveInput["status"] = "ok"): SaveInput => ({ ...okInput(["Porridge"]), status, promptVersion: v });
+
+  test("a menu read with an older prompt is not served from the cache", async () => {
+    await claimMenu(db, "old", T0);
+    await saveMenu(db, "old", atVersion(PROMPT_VERSION - 1), T0);
+    await claimMenu(db, "new", T0);
+    await saveMenu(db, "new", atVersion(PROMPT_VERSION), T0);
+    expect([...(await getCachedMenus(db, ["old", "new"], at(1000))).keys()]).toEqual(["new"]);
+  });
+
+  test("a menu read with an older prompt can be claimed for a re-read", async () => {
+    await claimMenu(db, "old", T0);
+    await saveMenu(db, "old", atVersion(PROMPT_VERSION - 1, "no_breakfast"), T0);
+    expect(await claimMenu(db, "old", at(1000))).toBe(true);
+  });
+
+  test("failures do not depend on the prompt and stay cached", async () => {
+    await claimMenu(db, "f", T0);
+    await saveMenu(db, "f", { ...atVersion(null, "no_menu_found"), dishes: [], counts: null }, T0);
+    expect((await getCachedMenus(db, ["f"], at(1000))).has("f")).toBe(true);
+    expect(await claimMenu(db, "f", at(1000))).toBe(false);
+  });
+});
+

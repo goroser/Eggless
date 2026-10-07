@@ -54,7 +54,7 @@ describe("handleMenu", () => {
       db,
       "p1",
       { status: "ok", sourceUrl: SITE, sourceType: "html", sources: [], contentHash: null, servedUntil: null,
-        dishes: [dish("Toast")], counts: { options: 1, adaptable: 0, eggMain: 0, total: 1 }, model: "m", promptVersion: 1 },
+        dishes: [dish("Toast")], counts: { options: 1, adaptable: 0, eggMain: 0, total: 1 }, model: "m", promptVersion: 3, imageUrl: null, siteDomain: null },
       NOW,
     );
     const extract = vi.fn();
@@ -75,7 +75,7 @@ describe("handleMenu", () => {
     expect(s.servedUntil).toBe("until 11:30");
     expect(s.sourceUrl).toBe("https://cafe.example/breakfast");
     const saved = await row("p1");
-    expect(saved).toMatchObject({ model: "claude-haiku-4-5", prompt_version: 1, source_type: "html" });
+    expect(saved).toMatchObject({ model: "claude-haiku-4-5", prompt_version: 3, source_type: "html" });
     expect(saved.sources).toEqual([SITE, "https://cafe.example/breakfast"]);
     expect(String(saved.content_hash)).toMatch(/^[0-9a-f]{64}$/);
     expect(new Date(String(saved.expires_at)).getTime()).toBe(NOW.getTime() + 30 * DAY);
@@ -163,4 +163,16 @@ describe("handleMenu", () => {
     expect(r).toEqual({ status: 503, json: { error: "temporary", retry: true } });
     expect(await claimMenu(db, "p1", NOW)).toBe(true);
   });
+
+  test("the website image and site domain are saved with the menu", async () => {
+    const fetcher = fixtureFetcher({
+      [SITE]: html(`<head><meta property="og:image" content="https://cafe.example/room.jpg"></head><a href="/breakfast">Breakfast</a><p>${words(60)}</p>`),
+      "https://cafe.example/breakfast": html(`<h1>Breakfast</h1><p>${words(100)}</p>`),
+      "https://cafe.example/room.jpg": { contentType: "image/jpeg", body: Buffer.alloc(100_000, 1) },
+    }).fetcher;
+    const r = await handleMenu({ token: token() }, deps(vi.fn(async () => menu), fetcher));
+    expect((r.json as MenuSummary).imageUrl).toBe("https://cafe.example/room.jpg");
+    expect(await row("p1")).toMatchObject({ image_url: "https://cafe.example/room.jpg", site_domain: "cafe.example" });
+  });
 });
+

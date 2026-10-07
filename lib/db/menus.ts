@@ -1,4 +1,5 @@
-import { and, asc, eq, gt, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, countDistinct, eq, gt, gte, inArray, ne, not, sql } from "drizzle-orm";
+import { PROMPT_VERSION } from "@/lib/menu/version";
 import type { Db } from "@/lib/db/client";
 import { dishes, menus } from "@/lib/db/schema";
 import type { Counts, Dish, EggStatus, MenuStatus, MenuSummary } from "@/lib/types";
@@ -14,9 +15,15 @@ export type SaveInput = {
   counts: Counts | null;
   model: string | null;
   promptVersion: number | null;
+  imageUrl: string | null;
+  siteDomain: string | null;
 };
 
 const DAY_MS = 86_400_000;
+
+// A read menu from an older prompt version is stale: what it kept depends on the prompt. Failures do not.
+const staleVersion = () =>
+  sql`(${menus.status} in ('ok', 'no_breakfast') and coalesce(${menus.promptVersion}, 0) < ${PROMPT_VERSION})`;
 const LEASE_MS = 2 * 60_000;
 
 export function expiryFor(status: SaveInput["status"], now: Date): Date {
@@ -37,10 +44,13 @@ function toSummary(m: MenuRow, ds: DishRow[]): MenuSummary {
     servedUntil: m.servedUntil,
     sourceUrl: m.sourceUrl,
     extractedAt: m.extractedAt ? new Date(m.extractedAt).toISOString() : null,
+    imageUrl: m.imageUrl,
     dishes: ds.map((d) => ({
       section: d.section,
       name: d.name,
+      nameRu: d.nameRu,
       description: d.description,
+      descriptionRu: d.descriptionRu,
       price: d.price,
       eggStatus: d.eggStatus as EggStatus,
       eggEvidence: d.eggEvidence,
@@ -55,7 +65,7 @@ export async function getCachedMenus(db: Db, placeIds: string[], now: Date): Pro
   const rows = await db
     .select()
     .from(menus)
-    .where(and(inArray(menus.placeId, placeIds), ne(menus.status, "pending"), gt(menus.expiresAt, now)));
+    .where(and(inArray(menus.placeId, placeIds), ne(menus.status, "pending"), gt(menus.expiresAt, now), not(staleVersion())));
   if (rows.length === 0) return out;
   const dishRows = await db
     .select()
@@ -76,7 +86,7 @@ export async function claimMenu(db: Db, placeId: string, now: Date): Promise<boo
     .onConflictDoUpdate({
       target: menus.placeId,
       set: { status: "pending", claimedAt: now },
-      setWhere: sql`(${menus.status} <> 'pending' and ${menus.expiresAt} < ${now.toISOString()})
+      setWhere: sql`(${menus.status} <> 'pending' and (${menus.expiresAt} < ${now.toISOString()} or ${staleVersion()}))
         or (${menus.status} = 'pending' and ${menus.claimedAt} < ${staleBefore.toISOString()})`,
     })
     .returning({ placeId: menus.placeId });
@@ -97,6 +107,8 @@ export async function saveMenu(db: Db, placeId: string, input: SaveInput, now: D
     totalCount: input.counts?.total ?? null,
     model: input.model,
     promptVersion: input.promptVersion,
+    imageUrl: input.imageUrl,
+    siteDomain: input.siteDomain,
     claimedAt: null,
     extractedAt: now,
     expiresAt: expiryFor(input.status, now),
@@ -120,4 +132,16 @@ export async function saveMenu(db: Db, placeId: string, input: SaveInput, now: D
 
 export async function releaseClaim(db: Db, placeId: string): Promise<void> {
   await db.delete(menus).where(and(eq(menus.placeId, placeId), eq(menus.status, "pending")));
+}
+
+// Website domains already stored for two or more different cafés: a sign of a chain.
+export async function sharedDomains(db: Db, domains: string[]): Promise<Set<string>> {
+  if (domains.length === 0) return new Set();
+  const rows = await db
+    .select({ domain: menus.siteDomain })
+    .from(menus)
+    .where(inArray(menus.siteDomain, domains))
+    .groupBy(menus.siteDomain)
+    .having(gte(countDistinct(menus.placeId), 2));
+  return new Set(rows.map((r) => r.domain!).filter(Boolean));
 }

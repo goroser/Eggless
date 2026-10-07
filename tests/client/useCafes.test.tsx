@@ -89,10 +89,10 @@ describe("useCafes", () => {
   });
 
   test("quota exhausted shows the copy", async () => {
-    stubFetch(() => Response.json({ error: "Daily search limit reached, try again tomorrow" }, { status: 503 }));
+    stubFetch(() => Response.json({ error: "Лимит поиска на сегодня исчерпан, попробуйте завтра" }, { status: 503 }));
     const { result } = renderHook(() => useCafes());
     await act(() => result.current.search({ rect: RECT }));
-    expect(result.current.error).toBe("Daily search limit reached, try again tomorrow");
+    expect(result.current.error).toBe("Лимит поиска на сегодня исчерпан, попробуйте завтра");
   });
 
   test("retry after an expired token re-runs the last search", async () => {
@@ -134,7 +134,7 @@ describe("useCafes", () => {
         searches++;
         return searches === 1
           ? searchResponse([cafe("a", null, { token: "t" })])
-          : Response.json({ error: "Daily search limit reached, try again tomorrow" }, { status: 503 });
+          : Response.json({ error: "Лимит поиска на сегодня исчерпан, попробуйте завтра" }, { status: 503 });
       }
       return new Promise<Response>(() => {});
     });
@@ -142,7 +142,7 @@ describe("useCafes", () => {
     await act(() => result.current.search({ rect: RECT }));
     expect(result.current.cafes[0].loading).toBe(true);
     await act(() => result.current.search({ rect: RECT }));
-    expect(result.current.error).toBe("Daily search limit reached, try again tomorrow");
+    expect(result.current.error).toBe("Лимит поиска на сегодня исчерпан, попробуйте завтра");
     expect(result.current.cafes[0].loading).toBe(false);
     expect(result.current.cafes[0].failed).toEqual({ expired: false });
   });

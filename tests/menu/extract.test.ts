@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
+import { z } from "zod";
 import { APICallError, LoadAPIKeyError, NoObjectGeneratedError, RetryError } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
-import { createExtractor, isCafeAttributableLlmError, PROMPT_VERSION } from "@/lib/menu/extract";
+import { createExtractor, isCafeAttributableLlmError, MenuSchema, PROMPT_VERSION } from "@/lib/menu/extract";
 import type { ExtractedMenu } from "@/lib/types";
 
 const menu: ExtractedMenu = {
@@ -9,7 +10,17 @@ const menu: ExtractedMenu = {
   hasBreakfast: true,
   servedUntil: "until 11:30",
   dishes: [
-    { section: "Breakfast", name: "Porridge", description: "oats", price: "£6", eggStatus: "no_egg", eggEvidence: "", substantial: true },
+    {
+      section: "Breakfast",
+      name: "Porridge",
+      nameRu: "Овсянка",
+      description: "oats",
+      descriptionRu: "овсяные хлопья",
+      price: "£6",
+      eggStatus: "no_egg",
+      eggEvidence: "",
+      substantial: true,
+    },
   ],
 };
 
@@ -53,7 +64,32 @@ describe("createExtractor", () => {
     expect(m.doGenerateCalls[0].temperature).toBe(0);
   });
 
-  test("prompt version is 1", () => expect(PROMPT_VERSION).toBe(1));
+  test("prompt version is 3", () => expect(PROMPT_VERSION).toBe(3));
+
+  test("the prompt keeps all food orderable in the morning and counts plated dishes fairly", async () => {
+    const m = model();
+    await createExtractor({ model: m })({ texts: [{ url: "u", text: "t" }], pdfs: [], images: [] });
+    const sent = JSON.stringify(m.doGenerateCalls[0].prompt);
+    expect(sent).toContain("every food item a customer could order in the morning");
+    expect(sent).toContain("toasties, sandwiches, wraps, salads");
+    expect(sent).toContain("only sections the menu says start later");
+    expect(sent).toContain("toast with a topping");
+    expect(sent).not.toContain("Include only breakfast, brunch and all-day breakfast dishes");
+    const schema = JSON.stringify(z.toJSONSchema(MenuSchema));
+    expect(schema).toContain("topped toast, served bowl");
+    expect(schema).not.toContain("a bowl of fruit");
+  });
+
+  test("a dish without a Russian name is rejected", () => {
+    const { nameRu: _omit, ...withoutRu } = menu.dishes[0];
+    expect(MenuSchema.safeParse({ ...menu, dishes: [withoutRu] }).success).toBe(false);
+  });
+
+  test("the schema tells the model how to translate", () => {
+    expect(JSON.stringify(z.toJSONSchema(MenuSchema))).toContain("Яйца Бенедикт");
+    expect(JSON.stringify(z.toJSONSchema(MenuSchema))).toContain("«Панкейки»");
+    expect(JSON.stringify(z.toJSONSchema(MenuSchema))).toContain("«скрэмбл»");
+  });
 });
 
 describe("isCafeAttributableLlmError", () => {

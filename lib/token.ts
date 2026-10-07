@@ -31,3 +31,25 @@ export function verifyToken(t: string, secret: string, nowMs = Date.now()): Toke
     return null;
   }
 }
+
+// Google photo references travel to the browser signed, so /api/photo only serves photos a search returned.
+export function signPhotoRef(name: string, secret: string, nowMs = Date.now()): string {
+  const body = Buffer.from(JSON.stringify({ k: "photo", name, exp: nowMs + TTL_MS })).toString("base64url");
+  return `${body}.${sign(body, secret)}`;
+}
+
+export function verifyPhotoRef(t: string, secret: string, nowMs = Date.now()): string | null {
+  const parts = t.split(".");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
+  const [body, sig] = parts;
+  const expected = Buffer.from(sign(body, secret));
+  const given = Buffer.from(sig);
+  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null;
+  try {
+    const p = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+    if (p?.k !== "photo" || typeof p.name !== "string" || typeof p.exp !== "number" || p.exp < nowMs) return null;
+    return p.name;
+  } catch {
+    return null;
+  }
+}

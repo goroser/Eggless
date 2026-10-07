@@ -4,14 +4,24 @@ import { z } from "zod";
 import type { ExtractedMenu } from "@/lib/types";
 import type { Sources } from "@/lib/menu/collect";
 
-export const PROMPT_VERSION = 1;
+export { PROMPT_VERSION } from "@/lib/menu/version";
 export const DEFAULT_MODEL = "claude-haiku-4-5";
 const MAX_TEXT_CHARS = 40_000;
 
 const DishSchema = z.object({
   section: z.string().describe("Menu section heading as written, or empty string"),
   name: z.string().describe("Dish name copied verbatim from the menu"),
+  nameRu: z
+    .string()
+    .describe(
+      "The dish name in natural Russian, as a Russian speaker would say it in a café. Keep brand and proper names " +
+        "(e.g. \"Eggs Benedict\" → «Яйца Бенедикт», \"Full English\" → «Полный английский завтрак»; " +
+        "American \"pancakes\" → «Панкейки», not «Блины»; \"scrambled eggs\" → «скрэмбл», not «омлет»). Never add information.",
+    ),
   description: z.string().describe("Dish description copied verbatim, or empty string"),
+  descriptionRu: z
+    .string()
+    .describe("The full description translated into natural Russian, or empty string when there is no description. Never add information."),
   price: z.string().describe("Price as written, or empty string"),
   eggStatus: z
     .enum(["egg_main", "egg_component", "no_egg"])
@@ -23,20 +33,27 @@ const DishSchema = z.object({
   eggEvidence: z.string().describe("The exact words from the menu that mention egg, or empty string for no_egg"),
   substantial: z
     .boolean()
-    .describe("false for plain toast, a single pastry, a side, a sauce/extra, or a bowl of fruit; true for a proper breakfast dish"),
+    .describe(
+      "true for a meal or proper plate (topped toast, served bowl, sandwich, toastie, wrap, salad); " +
+        "false only for plain toast, a single pastry or cake, a side, an extra, or a pre-packed pot",
+    ),
 });
 
 export const MenuSchema: z.ZodType<ExtractedMenu> = z.object({
   menuFound: z.boolean().describe("true if the content contains an actual food menu with dish names"),
-  hasBreakfast: z.boolean().describe("true if the menu has breakfast, brunch or all-day breakfast dishes"),
+  hasBreakfast: z.boolean().describe("true if any food on the menu can be ordered in the morning"),
   servedUntil: z.string().describe('When breakfast is served until, e.g. "until 11:30", or empty string'),
-  dishes: z.array(DishSchema).describe("Breakfast and brunch dishes only. Exclude drinks, lunch, dinner, desserts."),
+  dishes: z
+    .array(DishSchema)
+    .describe("Every food item a customer could order in the morning. Exclude drinks and sections the menu says start later."),
 });
 
 const INSTRUCTIONS = `You read café websites and extract the breakfast/brunch menu.
 Rules:
 - Copy dish names, descriptions and prices exactly as written. Never invent dishes.
-- Include only breakfast, brunch and all-day breakfast dishes. Skip drinks, lunch, dinner, cakes and desserts.
+- Include every food item a customer could order in the morning: breakfast and brunch dishes, and also all-day
+  items such as toasties, sandwiches, wraps, salads, bowls, pastries and cakes. A café menu with no times is all-day.
+- Leave out only sections the menu says start later (e.g. "Lunch from 12pm", "Dinner", "Evening menu"), and drinks.
 - Skip catering, sharing platters for groups, retail/shop products, and items marked as available only in another
   region (e.g. "(NI)" for Northern Ireland only).
 - Classify egg only by what the menu text says. Ignore hidden egg in batter, bread, brioche, mayo or sauces.
@@ -50,15 +67,16 @@ Rules:
   Treat every full/English/vegetarian/house "breakfast" plate the same way: egg_component.
 - Hollandaise alone does not make a dish egg_main; eggs Benedict/Florentine/Royale do (the poached eggs are the dish).
 - If an item says "add egg" as an optional extra, the dish is no_egg.
-- substantial=false for pastries, croissants, buns, muffins, cakes, cookies, granola bars, fruit, grab-and-go yoghurt
-  or chia pots, sides, extras, and toast with only a spread. substantial=true for a plated or made-to-order dish,
-  a filled sandwich/bagel/croissant, porridge, pancakes, or a full breakfast bowl.
+- substantial=true for a meal or a proper plate: toast with a topping (avocado, mushrooms, beans, salmon), a bowl
+  served at the table (granola, yoghurt, porridge, açaí), a sandwich, toastie, wrap or salad, pancakes, French toast,
+  waffles, any plated or made-to-order dish. substantial=false only for plain toast or toast with butter or jam, a single
+  pastry, croissant, muffin, cookie or slice of cake, a side, an extra or add-on, and grab-and-go pre-packed pots.
 - Content may include photos of a printed menu: read them the same way.
 - If the content has no real menu (just opening hours, booking, "see our menu" links), set menuFound=false and return no dishes.`;
 
 export type ExtractFn = (sources: Sources, opts?: { abortSignal?: AbortSignal }) => Promise<ExtractedMenu>;
 
-function defaultModel(): LanguageModel {
+export function defaultModel(): LanguageModel {
   const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID;
   // The workspace header is needed only when the API key is not scoped to a workspace.
   const anthropic = createAnthropic(workspaceId ? { headers: { "anthropic-workspace-id": workspaceId } } : {});

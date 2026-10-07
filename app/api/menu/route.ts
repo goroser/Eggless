@@ -3,7 +3,7 @@ import { handleMenu } from "@/lib/handlers/menu";
 import { createExtractor, DEFAULT_MODEL } from "@/lib/menu/extract";
 import { createFetcher } from "@/lib/menu/fetch";
 
-export const maxDuration = 60;
+export const maxDuration = 130;
 
 export async function POST(req: Request) {
   if (!process.env.MENU_TOKEN_SECRET || !process.env.ANTHROPIC_API_KEY) return Response.json({ error: "server is not configured" }, { status: 500 });

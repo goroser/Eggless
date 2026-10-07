@@ -13,7 +13,7 @@ describe("createPlacesClient", () => {
     const headers = new Headers(init?.headers);
     expect(headers.get("X-Goog-Api-Key")).toBe("KEY");
     expect(headers.get("X-Goog-FieldMask")).toBe(
-      "places.id,places.displayName,places.location,places.googleMapsUri,places.primaryType,places.rating,places.userRatingCount,places.currentOpeningHours.openNow,places.websiteUri,places.servesBreakfast",
+      "places.id,places.displayName,places.location,places.googleMapsUri,places.primaryType,places.rating,places.userRatingCount,places.currentOpeningHours.openNow,places.websiteUri,places.servesBreakfast,places.photos",
     );
     expect(JSON.parse(String(init?.body))).toEqual({
       textQuery: "breakfast cafe",
