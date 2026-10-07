@@ -25,12 +25,14 @@ export function CafeMap({
   focus,
   onSelect,
   onBoundsChange,
+  onMapClick,
 }: {
   cafes: CafeState[];
   selectedId: string | null;
   focus: { at: LatLng; seq: number } | null;
   onSelect: (placeId: string) => void;
   onBoundsChange: (r: Rect) => void;
+  onMapClick?: () => void;
 }) {
   return (
     <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""}>
@@ -41,6 +43,7 @@ export function CafeMap({
         mapId={process.env.NEXT_PUBLIC_GOOGLE_MAP_ID}
         gestureHandling="greedy"
         disableDefaultUI
+        onClick={() => onMapClick?.()}
         onBoundsChanged={(e) => {
           const b = e.detail.bounds;
           onBoundsChange({ low: { lat: b.south, lng: b.west }, high: { lat: b.north, lng: b.east } });
@@ -52,7 +55,13 @@ export function CafeMap({
           const selected = c.placeId === selectedId;
           return (
             <AdvancedMarker key={c.placeId} position={c.location} title={c.name} onClick={() => onSelect(c.placeId)} zIndex={selected ? 10 : 1}>
-              <Pin background={color} borderColor={selected ? "#1c1917" : color} glyphColor="#ffffff" scale={selected ? 1.2 : 1} />
+              {/* Chains get a hollow look: white centre; independents a solid one. */}
+              <Pin
+                background={c.chain ? "#ffffff" : color}
+                borderColor={selected ? "#1c1917" : color}
+                glyphColor={c.chain ? color : "#ffffff"}
+                scale={selected ? 1.2 : 1}
+              />
             </AdvancedMarker>
           );
         })}

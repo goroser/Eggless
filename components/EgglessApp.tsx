@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CafeCard } from "@/components/CafeCard";
 import { CafeMap } from "@/components/CafeMap";
+import { MapPreview } from "@/components/MapPreview";
 import { ChainFilter, useHideChains } from "@/components/ChainFilter";
 import { useCafes } from "@/lib/client/useCafes";
 import type { LatLng, Rect } from "@/lib/types";
@@ -18,6 +19,37 @@ export function EgglessApp() {
   const [notice, setNotice] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
   const bounds = useRef<Rect | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+
+  // Full screen owns one history entry, so the phone's back gesture closes the map instead of leaving the site.
+  const openFullscreen = () => {
+    setFullscreen(true);
+    // Reuse our entry if it is still there (back not processed yet), so entries never pile up.
+    if (history.state?.eggMap) history.replaceState({ eggMap: true }, "");
+    else history.pushState({ eggMap: true }, "");
+  };
+  const closeFullscreen = useCallback(() => {
+    setFullscreen(false);
+    setPreviewId(null);
+    if (history.state?.eggMap) history.back();
+  }, []);
+
+  useEffect(() => {
+    const onPop = () => {
+      setFullscreen(false);
+      setPreviewId(null);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  useEffect(() => {
+    document.body.style.overflow = fullscreen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [fullscreen]);
 
   const panTo = useCallback((at: LatLng) => setFocus((f) => ({ at, seq: (f?.seq ?? 0) + 1 })), []);
 
@@ -46,23 +78,47 @@ export function EgglessApp() {
     );
   };
 
+  const scrollToCard = (placeId: string) =>
+    document.getElementById(`cafe-${placeId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+
   const selectPin = (placeId: string) => {
     setSelectedId(placeId);
-    document.getElementById(`cafe-${placeId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (fullscreen) setPreviewId(placeId);
+    else scrollToCard(placeId);
   };
+
+  const preview = previewId ? visible.find((c) => c.placeId === previewId) : undefined;
 
   const message = error ?? notice;
 
   return (
     <main className="mx-auto max-w-xl">
-      <div className="relative h-[40dvh] w-full">
+      <div data-testid="map-container" className={fullscreen ? "fixed inset-0 z-40 h-dvh w-full bg-white" : "relative h-[40dvh] w-full"}>
         <CafeMap
           cafes={visible}
           selectedId={selectedId}
           focus={focus}
           onSelect={selectPin}
           onBoundsChange={(r) => (bounds.current = r)}
+          onMapClick={() => setPreviewId(null)}
         />
+        <button
+          type="button"
+          aria-label={fullscreen ? ru.closeMap : ru.fullscreen}
+          onClick={fullscreen ? closeFullscreen : openFullscreen}
+          className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg text-stone-900 shadow-lg"
+        >
+          {fullscreen ? "✕" : "⤢"}
+        </button>
+        {fullscreen && preview && (
+          <MapPreview
+            cafe={preview}
+            onMore={() => {
+              closeFullscreen();
+              setTimeout(() => scrollToCard(preview.placeId), 0);
+            }}
+          />
+        )}
         <div className="absolute inset-x-0 bottom-3 flex justify-center gap-2 px-4">
           <button
             type="button"
