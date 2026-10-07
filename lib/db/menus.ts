@@ -1,4 +1,5 @@
-import { and, asc, countDistinct, eq, gt, gte, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, countDistinct, eq, gt, gte, inArray, ne, not, sql } from "drizzle-orm";
+import { PROMPT_VERSION } from "@/lib/menu/version";
 import type { Db } from "@/lib/db/client";
 import { dishes, menus } from "@/lib/db/schema";
 import type { Counts, Dish, EggStatus, MenuStatus, MenuSummary } from "@/lib/types";
@@ -19,6 +20,10 @@ export type SaveInput = {
 };
 
 const DAY_MS = 86_400_000;
+
+// A read menu from an older prompt version is stale: what it kept depends on the prompt. Failures do not.
+const staleVersion = () =>
+  sql`(${menus.status} in ('ok', 'no_breakfast') and coalesce(${menus.promptVersion}, 0) < ${PROMPT_VERSION})`;
 const LEASE_MS = 2 * 60_000;
 
 export function expiryFor(status: SaveInput["status"], now: Date): Date {
@@ -60,7 +65,7 @@ export async function getCachedMenus(db: Db, placeIds: string[], now: Date): Pro
   const rows = await db
     .select()
     .from(menus)
-    .where(and(inArray(menus.placeId, placeIds), ne(menus.status, "pending"), gt(menus.expiresAt, now)));
+    .where(and(inArray(menus.placeId, placeIds), ne(menus.status, "pending"), gt(menus.expiresAt, now), not(staleVersion())));
   if (rows.length === 0) return out;
   const dishRows = await db
     .select()
@@ -81,7 +86,7 @@ export async function claimMenu(db: Db, placeId: string, now: Date): Promise<boo
     .onConflictDoUpdate({
       target: menus.placeId,
       set: { status: "pending", claimedAt: now },
-      setWhere: sql`(${menus.status} <> 'pending' and ${menus.expiresAt} < ${now.toISOString()})
+      setWhere: sql`(${menus.status} <> 'pending' and (${menus.expiresAt} < ${now.toISOString()} or ${staleVersion()}))
         or (${menus.status} = 'pending' and ${menus.claimedAt} < ${staleBefore.toISOString()})`,
     })
     .returning({ placeId: menus.placeId });

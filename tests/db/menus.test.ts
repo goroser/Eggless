@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { claimMenu, expiryFor, getCachedMenus, releaseClaim, saveMenu, sharedDomains, type SaveInput } from "@/lib/db/menus";
 import type { Db } from "@/lib/db/client";
 import { createTestDb } from "./testDb";
+import { PROMPT_VERSION } from "@/lib/menu/version";
 import { dish } from "../helpers/fixtures";
 
 const T0 = new Date("2026-10-05T09:00:00.000Z");
@@ -19,7 +20,7 @@ const okInput = (names: string[]): SaveInput => ({
   dishes: names.map((n) => dish(n)),
   counts: { options: names.length, adaptable: 0, eggMain: 0, total: names.length },
   model: "claude-haiku-4-5",
-  promptVersion: 2,
+  promptVersion: 3,
   imageUrl: null,
   siteDomain: "cafe.example",
 });
@@ -153,6 +154,31 @@ describe("Phase 2 columns", () => {
     }
     expect(await sharedDomains(db, ["a.com", "b.com", "c.com"])).toEqual(new Set(["a.com"]));
     expect(await sharedDomains(db, [])).toEqual(new Set());
+  });
+});
+
+describe("prompt version freshness", () => {
+  const atVersion = (v: number | null, status: SaveInput["status"] = "ok"): SaveInput => ({ ...okInput(["Porridge"]), status, promptVersion: v });
+
+  test("a menu read with an older prompt is not served from the cache", async () => {
+    await claimMenu(db, "old", T0);
+    await saveMenu(db, "old", atVersion(PROMPT_VERSION - 1), T0);
+    await claimMenu(db, "new", T0);
+    await saveMenu(db, "new", atVersion(PROMPT_VERSION), T0);
+    expect([...(await getCachedMenus(db, ["old", "new"], at(1000))).keys()]).toEqual(["new"]);
+  });
+
+  test("a menu read with an older prompt can be claimed for a re-read", async () => {
+    await claimMenu(db, "old", T0);
+    await saveMenu(db, "old", atVersion(PROMPT_VERSION - 1, "no_breakfast"), T0);
+    expect(await claimMenu(db, "old", at(1000))).toBe(true);
+  });
+
+  test("failures do not depend on the prompt and stay cached", async () => {
+    await claimMenu(db, "f", T0);
+    await saveMenu(db, "f", { ...atVersion(null, "no_menu_found"), dishes: [], counts: null }, T0);
+    expect((await getCachedMenus(db, ["f"], at(1000))).has("f")).toBe(true);
+    expect(await claimMenu(db, "f", at(1000))).toBe(false);
   });
 });
 

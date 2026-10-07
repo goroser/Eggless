@@ -17,6 +17,7 @@ const ResultSchema = z.object({
 
 const INSTRUCTIONS = `You translate London café breakfast menus into natural Russian, as a Russian speaker would say it in a café.
 Keep brand and proper names (e.g. "Eggs Benedict" → «Яйца Бенедикт», "Full English" → «Полный английский завтрак»).
+American "pancakes" are «Панкейки», not «Блины»; "scrambled eggs" are «скрэмбл», not «омлет».
 Never add information. Return exactly one item per input dish, in the same order.`;
 
 // Text-only translation of dishes already stored, for menus read before prompt version 2.

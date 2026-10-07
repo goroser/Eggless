@@ -28,6 +28,7 @@ describe("createTranslator", () => {
     ]);
     expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain("Porridge");
     expect(model.doGenerateCalls[0].temperature).toBe(0);
+    expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain("«Панкейки»");
   });
 
   test("a reply with the wrong number of items is an error", async () => {

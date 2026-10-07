@@ -64,7 +64,21 @@ describe("createExtractor", () => {
     expect(m.doGenerateCalls[0].temperature).toBe(0);
   });
 
-  test("prompt version is 2", () => expect(PROMPT_VERSION).toBe(2));
+  test("prompt version is 3", () => expect(PROMPT_VERSION).toBe(3));
+
+  test("the prompt keeps all food orderable in the morning and counts plated dishes fairly", async () => {
+    const m = model();
+    await createExtractor({ model: m })({ texts: [{ url: "u", text: "t" }], pdfs: [], images: [] });
+    const sent = JSON.stringify(m.doGenerateCalls[0].prompt);
+    expect(sent).toContain("every food item a customer could order in the morning");
+    expect(sent).toContain("toasties, sandwiches, wraps, salads");
+    expect(sent).toContain("only sections the menu says start later");
+    expect(sent).toContain("toast with a topping");
+    expect(sent).not.toContain("Include only breakfast, brunch and all-day breakfast dishes");
+    const schema = JSON.stringify(z.toJSONSchema(MenuSchema));
+    expect(schema).toContain("topped toast, served bowl");
+    expect(schema).not.toContain("a bowl of fruit");
+  });
 
   test("a dish without a Russian name is rejected", () => {
     const { nameRu: _omit, ...withoutRu } = menu.dishes[0];
@@ -73,6 +87,8 @@ describe("createExtractor", () => {
 
   test("the schema tells the model how to translate", () => {
     expect(JSON.stringify(z.toJSONSchema(MenuSchema))).toContain("Яйца Бенедикт");
+    expect(JSON.stringify(z.toJSONSchema(MenuSchema))).toContain("«Панкейки»");
+    expect(JSON.stringify(z.toJSONSchema(MenuSchema))).toContain("«скрэмбл»");
   });
 });
 

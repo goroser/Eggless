@@ -71,7 +71,7 @@ describe("handleSearch", () => {
       {
         status: "ok", sourceUrl: "https://cached.example/menu", sourceType: "html", sources: [], contentHash: null,
         servedUntil: null, dishes: [dish("Porridge")], counts: { options: 1, adaptable: 0, eggMain: 0, total: 1 },
-        model: "m", promptVersion: 1, imageUrl: null, siteDomain: null,
+        model: "m", promptVersion: 3, imageUrl: null, siteDomain: null,
       },
       NOW,
     );
