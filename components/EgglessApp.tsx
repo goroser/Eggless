@@ -3,12 +3,16 @@
 import { useCallback, useRef, useState } from "react";
 import { CafeCard } from "@/components/CafeCard";
 import { CafeMap } from "@/components/CafeMap";
+import { ChainFilter, useHideChains } from "@/components/ChainFilter";
 import { useCafes } from "@/lib/client/useCafes";
 import type { LatLng, Rect } from "@/lib/types";
 import { ru } from "@/lib/i18n/ru";
 
 export function EgglessApp() {
   const { cafes, searching, error, search, retry } = useCafes();
+  const [hideChains, setHideChains] = useHideChains();
+  const visible = hideChains ? cafes.filter((c) => !c.chain) : cafes;
+  const allHidden = hideChains && cafes.length > 0 && visible.length === 0;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ at: LatLng; seq: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -53,7 +57,7 @@ export function EgglessApp() {
     <main className="mx-auto max-w-xl">
       <div className="relative h-[40dvh] w-full">
         <CafeMap
-          cafes={cafes}
+          cafes={visible}
           selectedId={selectedId}
           focus={focus}
           onSelect={selectPin}
@@ -84,10 +88,20 @@ export function EgglessApp() {
         {!searched && !message && (
           <p className="text-sm text-stone-500">{ru.hint}</p>
         )}
-        {searched && !searching && !error && cafes.length === 0 && (
+        {cafes.length > 0 && (
+          <div className="flex justify-end">
+            <ChainFilter on={hideChains} onChange={setHideChains} />
+          </div>
+        )}
+        {searched && !searching && !error && (cafes.length === 0 || allHidden) && (
           <p className="text-sm text-stone-500">{ru.noCafes}</p>
         )}
-        {cafes.map((c) => (
+        {allHidden && (
+          <button type="button" onClick={() => setHideChains(false)} className="text-sm text-stone-700 underline">
+            {ru.showChains}
+          </button>
+        )}
+        {visible.map((c) => (
           <CafeCard
             key={c.placeId}
             cafe={c}

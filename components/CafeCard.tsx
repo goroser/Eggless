@@ -5,11 +5,30 @@ import { headline } from "@/lib/client/format";
 import type { CafeState } from "@/lib/client/useCafes";
 import type { Dish } from "@/lib/types";
 import { ru } from "@/lib/i18n/ru";
+import { CafePhotos } from "@/components/CafePhotos";
 
-function DishItem({ d }: { d: Dish }) {
+const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+// Russian name as the main line, the menu's English underneath (that is what to say at the counter).
+function DishName({ d }: { d: Dish }) {
+  const ruName = d.nameRu.trim();
+  if (!ruName || same(ruName, d.name)) return <span>{d.name}</span>;
+  return (
+    <span className="flex flex-col">
+      <span>{ruName}</span>
+      <span className="text-xs text-stone-500">{d.name}</span>
+    </span>
+  );
+}
+
+function DishItem({ d, withDescription = false }: { d: Dish; withDescription?: boolean }) {
+  const description = d.descriptionRu.trim() || d.description.trim();
   return (
     <li className={`flex justify-between gap-3 py-0.5 ${d.substantial ? "" : "text-stone-400"}`}>
-      <span>{d.name}</span>
+      <span className="flex flex-col">
+        <DishName d={d} />
+        {withDescription && description && <span className="text-xs text-stone-500">{description}</span>}
+      </span>
       {d.price && <span className="shrink-0 tabular-nums text-stone-500">{d.price}</span>}
     </li>
   );
@@ -25,7 +44,7 @@ function FullMenu({ dishes }: { dishes: Dish[] }) {
       {noEgg.length > 0 && (
         <ul>
           {noEgg.map((d, i) => (
-            <DishItem key={i} d={d} />
+            <DishItem key={i} d={d} withDescription />
           ))}
         </ul>
       )}
@@ -34,7 +53,7 @@ function FullMenu({ dishes }: { dishes: Dish[] }) {
           <h4 className="font-medium text-amber-700">{ru.askWithoutEgg}</h4>
           <ul>
             {adaptable.map((d, i) => (
-              <DishItem key={i} d={d} />
+              <DishItem key={i} d={d} withDescription />
             ))}
           </ul>
         </div>
@@ -47,7 +66,9 @@ function FullMenu({ dishes }: { dishes: Dish[] }) {
           {showEgg && (
             <ul className="mt-1 text-stone-400 line-through decoration-stone-300">
               {egg.map((d, i) => (
-                <li key={i}>{d.name}</li>
+                <li key={i}>
+                  <DishName d={d} />
+                </li>
               ))}
             </ul>
           )}
@@ -68,9 +89,12 @@ export function CafeCard({ cafe, onRetry, onSelect }: { cafe: CafeState; onRetry
   return (
     <article id={`cafe-${cafe.placeId}`} className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
       <header className="flex items-baseline justify-between gap-3">
-        <button type="button" onClick={onSelect} className="text-left text-base font-semibold">
-          {cafe.name}
-        </button>
+        <span className="flex items-baseline gap-2">
+          <button type="button" onClick={onSelect} className="text-left text-base font-semibold">
+            {cafe.name}
+          </button>
+          {cafe.chain && <span className="rounded bg-stone-100 px-1.5 text-xs text-stone-500">{ru.chain}</span>}
+        </span>
         <div className="shrink-0 text-xs text-stone-500">
           {cafe.rating !== undefined && (
             <span>
@@ -85,6 +109,8 @@ export function CafeCard({ cafe, onRetry, onSelect }: { cafe: CafeState; onRetry
           )}
         </div>
       </header>
+
+      <CafePhotos imageUrl={menu?.imageUrl ?? null} photos={cafe.photos} name={cafe.name} />
 
       <p className={`mt-1 ${cafe.loading ? "animate-pulse text-stone-400" : ""}`}>
         <span className={isOk ? "text-lg font-bold text-green-800" : "text-stone-500"}>{head.main}</span>

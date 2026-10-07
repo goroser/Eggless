@@ -107,4 +107,52 @@ describe("CafeCard", () => {
     renderCard({ ...c, menu: { ...c.menu!, servedUntil: "all day" } });
     expect(document.body.textContent).not.toMatch(/завтраки до/);
   });
+
+  describe("Russian dish names", () => {
+    const withDishes = (dishes: ReturnType<typeof dish>[]) => {
+      const c = okCafe();
+      return { ...c, menu: { ...c.menu!, dishes } };
+    };
+
+    test("Russian name first, English original underneath", () => {
+      renderCard(withDishes([dish("Porridge", { nameRu: "Овсянка", price: "£6" })]));
+      const item = within(screen.getByTestId("top-dishes")).getAllByRole("listitem")[0];
+      expect(item.textContent).toBe("ОвсянкаPorridge£6");
+      expect(within(item).getByText("Porridge").className).toContain("text-stone-500");
+    });
+
+    test("untranslated dishes show the English name only", () => {
+      renderCard(withDishes([dish("Porridge")]));
+      expect(within(screen.getByTestId("top-dishes")).getAllByRole("listitem")[0].textContent).toBe("Porridge");
+    });
+
+    test("a Russian name equal to the English shows once", () => {
+      renderCard(withDishes([dish("Açaí Bowl", { nameRu: " açaí bowl " })]));
+      expect(within(screen.getByTestId("top-dishes")).getAllByText(/açaí bowl/i)).toHaveLength(1);
+    });
+
+    test("the full menu shows the Russian description, or the English one", () => {
+      renderCard(
+        withDishes([
+          dish("Porridge", { nameRu: "Овсянка", description: "oats", descriptionRu: "овсяные хлопья" }),
+          dish("Toast", { description: "sourdough" }),
+        ]),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Всё меню" }));
+      const full = within(screen.getByTestId("full-menu"));
+      expect(full.getByText("овсяные хлопья")).toBeTruthy();
+      expect(full.getByText("sourdough")).toBeTruthy();
+    });
+  });
+
+  test("chains carry a badge", () => {
+    renderCard(okCafe({ chain: true }));
+    expect(screen.getByText("Сеть")).toBeTruthy();
+  });
+
+  test("non-chains have no badge", () => {
+    renderCard(okCafe());
+    expect(screen.queryByText("Сеть")).toBeNull();
+  });
 });
+
