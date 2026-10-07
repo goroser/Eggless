@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createMenuQueue, type FetchMenu, type QueueResult } from "@/lib/client/queue";
 import { rankCafes } from "@/lib/menu/score";
 import type { CafeResult, LatLng, MenuSummary, Rect } from "@/lib/types";
+import { ru } from "@/lib/i18n/ru";
 
 export type CafeState = CafeResult & { loading: boolean; failed?: { expired: boolean } };
 export type SearchArea = { rect: Rect } | { near: LatLng };
@@ -67,7 +68,7 @@ export function useCafes() {
       if (seq !== searchSeq.current) return; // a newer search has started
       if (!res.ok || !json.cafes) {
         setCafes(stopLoading);
-        setError(json.error ?? "Search failed, try again");
+        setError(json.error ?? ru.searchFailed);
         return;
       }
       setCafes(rank(json.cafes.map((c) => ({ ...c, loading: !c.menu && !!c.token }))));
@@ -75,7 +76,7 @@ export function useCafes() {
     } catch {
       if (seq === searchSeq.current) {
         setCafes(stopLoading);
-        setError("Search failed, try again");
+        setError(ru.searchFailed);
       }
     } finally {
       if (seq === searchSeq.current) setSearching(false);

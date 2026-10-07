@@ -115,7 +115,7 @@ describe("handleSearch", () => {
   test("quota exhausted is 503 with the copy", async () => {
     expect(await run({ rect: RECT }, new PlacesQuotaError("q")).result).toEqual({
       status: 503,
-      json: { error: "Daily search limit reached, try again tomorrow" },
+      json: { error: "Лимит поиска на сегодня исчерпан, попробуйте завтра" },
     });
   });
 

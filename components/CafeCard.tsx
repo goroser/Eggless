@@ -4,9 +4,7 @@ import { useState } from "react";
 import { headline } from "@/lib/client/format";
 import type { CafeState } from "@/lib/client/useCafes";
 import type { Dish } from "@/lib/types";
-
-const readDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Europe/London" });
+import { ru } from "@/lib/i18n/ru";
 
 function DishItem({ d }: { d: Dish }) {
   return (
@@ -33,7 +31,7 @@ function FullMenu({ dishes }: { dishes: Dish[] }) {
       )}
       {adaptable.length > 0 && (
         <div>
-          <h4 className="font-medium text-amber-700">Ask without egg</h4>
+          <h4 className="font-medium text-amber-700">{ru.askWithoutEgg}</h4>
           <ul>
             {adaptable.map((d, i) => (
               <DishItem key={i} d={d} />
@@ -44,7 +42,7 @@ function FullMenu({ dishes }: { dishes: Dish[] }) {
       {egg.length > 0 && (
         <div>
           <button type="button" className="text-stone-500 underline" onClick={() => setShowEgg((v) => !v)}>
-            {egg.length} egg dishes hidden
+            {ru.eggHidden(egg.length)}
           </button>
           {showEgg && (
             <ul className="mt-1 text-stone-400 line-through decoration-stone-300">
@@ -62,7 +60,8 @@ function FullMenu({ dishes }: { dishes: Dish[] }) {
 export function CafeCard({ cafe, onRetry, onSelect }: { cafe: CafeState; onRetry: () => void; onSelect: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const menu = cafe.menu;
-  const head = cafe.failed ? { main: "Couldn't read the menu" } : cafe.loading ? { main: "Reading the menu…" } : headline(menu);
+  const head = cafe.failed ? { main: ru.failed } : cafe.loading ? { main: ru.reading } : headline(menu);
+  const served = menu?.status === "ok" ? ru.servedUntil(menu.servedUntil) : null;
   const isOk = !cafe.failed && menu?.status === "ok";
   const top = isOk ? menu.dishes.filter((d) => d.eggStatus === "no_egg" && d.substantial).slice(0, 3) : [];
 
@@ -81,7 +80,7 @@ export function CafeCard({ cafe, onRetry, onSelect }: { cafe: CafeState; onRetry
           )}
           {cafe.openNow !== undefined && (
             <span className={`ml-2 ${cafe.openNow ? "text-green-700" : "text-stone-500"}`}>
-              {cafe.openNow ? "Open now" : "Closed"}
+              {cafe.openNow ? ru.openNow : ru.closed}
             </span>
           )}
         </div>
@@ -94,7 +93,7 @@ export function CafeCard({ cafe, onRetry, onSelect }: { cafe: CafeState; onRetry
 
       {cafe.failed && (
         <button type="button" onClick={onRetry} className="mt-2 rounded-lg border border-stone-300 px-3 py-1 text-sm">
-          Retry
+          {ru.retry}
         </button>
       )}
 
@@ -109,7 +108,7 @@ export function CafeCard({ cafe, onRetry, onSelect }: { cafe: CafeState; onRetry
       {isOk && menu.dishes.length > 0 && (
         <>
           <button type="button" className="mt-2 text-sm text-stone-600 underline" onClick={() => setExpanded((v) => !v)}>
-            {expanded ? "Hide full menu" : "Show full menu"}
+            {expanded ? ru.hideMenu : ru.showMenu}
           </button>
           {expanded && <FullMenu dishes={menu.dishes} />}
         </>
@@ -118,17 +117,17 @@ export function CafeCard({ cafe, onRetry, onSelect }: { cafe: CafeState; onRetry
       <footer className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-stone-500">
         {menu?.extractedAt && menu.status !== "pending" && (
           <span>
-            Menu read {readDate(menu.extractedAt)}
-            {menu.servedUntil && ` · served ${menu.servedUntil.replace(/^served\s+/i, "")}`}
+            {ru.menuRead(menu.extractedAt)}
+            {served && ` · ${served}`}
           </span>
         )}
         {menu?.sourceUrl && (
           <a href={menu.sourceUrl} target="_blank" rel="noreferrer" className="underline">
-            Source menu
+            {ru.sourceMenu}
           </a>
         )}
         <a href={cafe.googleMapsUri} target="_blank" rel="noreferrer" className="underline">
-          Google Maps
+          {ru.googleMaps}
         </a>
       </footer>
     </article>

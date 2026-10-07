@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE, gate } from "@/lib/access";
+import { ru } from "@/lib/i18n/ru";
 
-const DENIED_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Eggless</title></head><body style="font-family:system-ui,sans-serif;padding:2rem;color:#1c1917;background:#fafaf9"><p>This is a private page. Ask Roman for the link.</p></body></html>`;
+const DENIED_PAGE = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Eggless</title></head><body style="font-family:system-ui,sans-serif;padding:2rem;color:#1c1917;background:#fafaf9"><p>${ru.privatePage}</p></body></html>`;
 
 export function proxy(req: NextRequest) {
   const decision = gate(req.nextUrl, req.cookies.get(COOKIE)?.value, process.env.ACCESS_KEY ?? "");

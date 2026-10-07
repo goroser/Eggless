@@ -5,6 +5,7 @@ import { CafeCard } from "@/components/CafeCard";
 import { CafeMap } from "@/components/CafeMap";
 import { useCafes } from "@/lib/client/useCafes";
 import type { LatLng, Rect } from "@/lib/types";
+import { ru } from "@/lib/i18n/ru";
 
 export function EgglessApp() {
   const { cafes, searching, error, search, retry } = useCafes();
@@ -26,7 +27,7 @@ export function EgglessApp() {
   const nearMe = () => {
     setNotice(null);
     if (!navigator.geolocation) {
-      setNotice("Location is off; pan the map and tap Search this area");
+      setNotice(ru.locationOff);
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -36,7 +37,7 @@ export function EgglessApp() {
         setSearched(true);
         void search({ near: at });
       },
-      () => setNotice("Location is off; pan the map and tap Search this area"),
+      () => setNotice(ru.locationOff),
       { timeout: 10_000, maximumAge: 60_000 },
     );
   };
@@ -65,7 +66,7 @@ export function EgglessApp() {
             disabled={searching}
             className="rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-white shadow-lg disabled:opacity-60"
           >
-            {searching ? "Searching…" : "Search this area"}
+            {searching ? ru.searching : ru.searchArea}
           </button>
           <button
             type="button"
@@ -73,7 +74,7 @@ export function EgglessApp() {
             disabled={searching}
             className="rounded-full bg-white px-4 py-2 text-sm font-medium text-stone-900 shadow-lg disabled:opacity-60"
           >
-            Near me
+            {ru.nearMe}
           </button>
         </div>
       </div>
@@ -81,10 +82,10 @@ export function EgglessApp() {
       <section className="space-y-3 px-4 py-4">
         {message && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{message}</p>}
         {!searched && !message && (
-          <p className="text-sm text-stone-500">Tap Near me, or move the map and tap Search this area.</p>
+          <p className="text-sm text-stone-500">{ru.hint}</p>
         )}
         {searched && !searching && !error && cafes.length === 0 && (
-          <p className="text-sm text-stone-500">No cafés found here</p>
+          <p className="text-sm text-stone-500">{ru.noCafes}</p>
         )}
         {cafes.map((c) => (
           <CafeCard

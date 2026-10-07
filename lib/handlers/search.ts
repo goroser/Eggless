@@ -5,6 +5,7 @@ import { rankCafes } from "@/lib/menu/score";
 import { nearToRect, PlacesError, PlacesQuotaError, rectTooLarge, type Place, type SearchPlacesFn } from "@/lib/places";
 import { signToken } from "@/lib/token";
 import type { CafeResult, MenuSummary, Rect } from "@/lib/types";
+import { ru } from "@/lib/i18n/ru";
 
 export type SearchDeps = { db: Db; searchPlaces: SearchPlacesFn; tokenSecret: string; now: Date };
 
@@ -26,7 +27,7 @@ const NO_WEBSITE: MenuSummary = {
 function toCafe(p: Place & { location: NonNullable<Place["location"]> }): CafeResult {
   const cafe: CafeResult = {
     placeId: p.id,
-    name: p.displayName?.text ?? "Unnamed café",
+    name: p.displayName?.text ?? "—",
     location: { lat: p.location.latitude, lng: p.location.longitude },
     googleMapsUri: p.googleMapsUri ?? `https://www.google.com/maps/place/?q=place_id:${p.id}`,
     menu: null,
@@ -41,14 +42,14 @@ export async function handleSearch(body: unknown, deps: SearchDeps): Promise<{ s
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) return { status: 400, json: { error: "invalid request" } };
   const rect: Rect = "rect" in parsed.data ? parsed.data.rect : nearToRect(parsed.data.near);
-  if (rectTooLarge(rect)) return { status: 400, json: { error: "Zoom in to search a smaller area" } };
+  if (rectTooLarge(rect)) return { status: 400, json: { error: ru.searchFailed } };
 
   let places: Place[];
   try {
     places = await deps.searchPlaces(rect);
   } catch (e) {
-    if (e instanceof PlacesQuotaError) return { status: 503, json: { error: "Daily search limit reached, try again tomorrow" } };
-    if (e instanceof PlacesError) return { status: 502, json: { error: "Google search failed, try again" } };
+    if (e instanceof PlacesQuotaError) return { status: 503, json: { error: ru.quota } };
+    if (e instanceof PlacesError) return { status: 502, json: { error: ru.searchFailed } };
     throw e;
   }
 
