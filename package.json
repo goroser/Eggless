@@ -2,7 +2,6 @@
   "name": "eggless",
   "version": "1.0.0",
   "description": "Find a breakfast place for someone who does not eat eggs.",
-  "main": "index.js",
   "directories": {
     "doc": "docs"
   },
@@ -22,9 +21,16 @@
     "type": "git",
     "url": "git+https://github.com/goroser/Eggless.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "nextjs",
+    "google-maps",
+    "llm",
+    "menu",
+    "breakfast",
+    "egg-free"
+  ],
+  "author": "goroser",
+  "license": "MIT",
   "type": "module",
   "bugs": {
     "url": "https://github.com/goroser/Eggless/issues"

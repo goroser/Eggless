@@ -5,7 +5,7 @@ Builds on [ARCHITECTURE.md](../../ARCHITECTURE.md) and the Phase 0 results in [S
 
 ## 1. Goal and success
 
-Inga opens one link on her phone, taps "Near me" or "Search this area", and sees breakfast cafés ranked by how many dishes she can order as they are, with egg dishes hidden.
+The user opens one link on their phone, taps "Near me" or "Search this area", and sees breakfast cafés ranked by how many dishes they can order as they are, with egg dishes hidden.
 
 Phase 1 is done when:
 

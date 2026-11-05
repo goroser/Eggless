@@ -1,11 +1,11 @@
 # Phase 2 design: Russian, full-screen map, photos, chains
 
 Status: approved in conversation 2026-10-07, awaiting review of this written spec.
-Builds on [the Phase 1 spec](2026-10-05-phase1-mvp-design.md) and the live app at https://eggless-gold.vercel.app. Where this spec and earlier documents differ, this spec wins.
+Builds on [the Phase 1 spec](2026-10-05-phase1-mvp-design.md) and the live Phase 1 app. Where this spec and earlier documents differ, this spec wins.
 
 ## 1. Goal and success
 
-Inga uses Eggless in Russian, can open the map full screen while walking, sees what a café looks like before going, and can hide chains.
+The user can use Eggless in Russian, can open the map full screen while walking, sees what a café looks like before going, and can hide chains.
 
 Phase 2 is done when:
 
